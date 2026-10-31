@@ -357,18 +357,23 @@ test("n8n directory contains all 8 workflows, excludes raw My workflow, and has 
   assert.strictEqual(byName(ingest, "Verify User").parameters.options.response.response.neverError, true);
   assert.strictEqual(byName(ingest, "Download PDF from URL").parameters.options.redirect.redirect.maxRedirects, 0,
     "URL ingestion must not follow redirects to unvalidated hosts");
-  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /new URL\(raw\)/);
-  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /url\.protocol !== 'https:'/);
-  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /allowedHosts\.has\(host\)/);
-  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /url\.username \|\| url\.password/);
+  const urlGuardCode = byName(ingest, "Validate PDF URL").parameters.jsCode;
+  assert.match(urlGuardCode, /strictHttpsLink/);
+  assert.match(urlGuardCode, /allowedHosts\.has\(host\)/);
+  assert.ok(!/\bnew URL\b|URLSearchParams|\brequire\(/.test(urlGuardCode),
+    "URL guard must not require Web API globals or module imports in the n8n sandbox");
   assert.match(byName(ingest, "PDF to Base64").parameters.jsCode, /MAX_PDF_BYTES/);
   const runUrlGuard = (pdfUrl) =>
-    new Function(
-      "$input",
-      byName(ingest, "Validate PDF URL").parameters.jsCode,
-    )({
-      first: () => ({ json: { body: { pdf_url: pdfUrl } }, binary: {} }),
-    })[0].json._safe_pdf_url;
+    vm.runInNewContext(
+      "(function () {" + urlGuardCode + "\n})()",
+      {
+        $input: { first: () => ({ json: { body: { pdf_url: pdfUrl } }, binary: {} }) },
+        URL: undefined,
+        URLSearchParams: undefined,
+        require: undefined,
+      },
+      { timeout: 1000 },
+    )[0].json._safe_pdf_url;
   assert.strictEqual(
     runUrlGuard("https://drive.google.com/file/d/abc_123-xyz/view"),
     "https://drive.google.com/uc?export=download&id=abc_123-xyz",
@@ -377,13 +382,25 @@ test("n8n directory contains all 8 workflows, excludes raw My workflow, and has 
     runUrlGuard("https://www.dropbox.com/s/abc123/file.pdf?rlkey=xyz"),
     /^https:\/\/www\.dropbox\.com\/s\/abc123\/file\.pdf\?.*dl=1/,
   );
+  assert.strictEqual(
+    runUrlGuard("https://www.dropbox.com/s/abc123/file%20name.pdf"),
+    "https://www.dropbox.com/s/abc123/file%20name.pdf?dl=1",
+  );
   for (const blockedUrl of [
     "http://drive.google.com/file/d/abc123/view",
     "https://drive.google.com.attacker.example/file/d/abc123/view",
     "https://127.0.0.1/internal.pdf",
+    "https://drive.google.com:8443/file/d/abc123/view",
+    "https://drive.google.com/file/d/abc123/view#fragment",
+    "https://www.dropbox.com/s/abc123/../other.pdf",
   ]) {
     assert.throws(() => runUrlGuard(blockedUrl), /Rejected PDF URL/);
   }
+  const syntheticUserinfoUrl = [
+    "https://synthetic",
+    "drive.google.com/file/d/abc123/view",
+  ].join(String.fromCharCode(64));
+  assert.throws(() => runUrlGuard(syntheticUserinfoUrl), /Rejected PDF URL/);
   assert.deepStrictEqual(edgeTargets(ingest, "Knowledge Indexed Summary"), ["Respond Ingest Summary"]);
 
   const configRaw = readFileSync("js/config.js", "utf8");
