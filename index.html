@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>مُحكَم — منصة قانونية عربية</title>
+<meta name="description" content="مراجعة العقود وصياغتها والبحث القانوني والترجمة بلغة واضحة ومصادر موثقة.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="hd"><div class="c"><a class="brand" href="#top"><span class="mk">م</span><span data-brand></span></a>
+<nav><a href="#services">الخدمات</a><a href="#how">كيف تعمل</a><a href="#explain">شرح مبسّط</a><a href="#chat">اسأل</a><a href="#hist" id="nh" class="h">سجلّي</a><a href="#support">الدعم</a><a href="#trust">المصادر والخصوصية</a></nav>
+<div class="ctl"><div class="sw" id="sw"><button data-p="classic" style="background:#14264a"></button><button data-p="emerald" style="background:#0f3b2e"></button><button data-p="burgundy" style="background:#4a1526"></button><button data-p="slate" style="background:#2c7a86"></button><button data-p="night" style="background:#0e1626"></button></div><button class="ab" id="ab" onclick="acct()">تسجيل الدخول</button><button class="ab h" id="ao" onclick="out()">خروج</button><button class="lg" id="lg" onclick="setLang()">EN</button><button class="mb" id="mb" type="button" aria-label="Menu" onclick="document.querySelector('nav').classList.toggle('open')">☰</button><a class="btn" href="#tool" onclick="tab('review')">ابدأ المراجعة</a></div></div></header>
+
+<main id="top">
+<section class="hero"><div class="c"><div>
+<span class="eyebrow">منصة قانونية عربية</span>
+<h1>افهم عقدك قبل أن توقّع عليه</h1>
+<p><span data-brand></span> يراجع عقدك بندًا بندًا، ينبّهك إلى المخاطر، ويشرح كل نقطة بلغة واضحة مستندة إلى مصادر قانونية موثقة.</p>
+<a class="btn" href="#tool" onclick="tab('review')">راجع عقدك الآن</a> <a class="btn o" href="#explain">اقرأ الشرح المبسّط</a></div>
+<aside class="scope"><h3>نطاق الخدمة حاليًا</h3><ul><li>عقود الإيجار السكني بين الأفراد</li><li>عقود بيع السيارات بين الأفراد</li><li>للأفراد والمحامين والباحثين القانونيين</li><li>سواء كان العقد موقّعًا أم لا</li></ul></aside></div></section>
+
+<section class="s" id="services"><div class="c"><div class="sh"><span class="eyebrow">الخدمات</span><h2>أربع خدمات في مكان واحد</h2><p>اختر ما تحتاجه الآن؛ المراجعة هي المسار الأساسي.</p></div>
+<div class="grid4">
+<button class="card svc" onclick="go('review')"><span class="n">١</span><h3>مراجعة العقود</h3><p>تحليل البنود وتصنيف المخاطر واقتراح تعديلات مناسبة لحالتك.</p></button>
+<button class="card svc" onclick="go('draft')"><span class="n">٢</span><h3>صياغة العقود</h3><p>مسودة منظمة تراعي الأحكام الشائعة لنوع العقد.</p></button>
+<button class="card svc" onclick="go('research')"><span class="n">٣</span><h3>البحث القانوني</h3><p>إجابات مبنية على مكتبة مصادر داخلية، مع بحث خارجي عند الحاجة.</p></button>
+<button class="card svc" onclick="go('translate')"><span class="n">٤</span><h3>ترجمة العقود</h3><p>ترجمة قانونية بمصطلحات ثابتة بين العربية والإنجليزية.</p></button></div></div></section>
+
+<section class="s alt" id="how"><div class="c"><div class="sh"><span class="eyebrow">آلية العمل</span><h2>من الملف إلى تقرير واضح</h2></div>
+<div class="grid4">
+<div class="stp"><b>١</b><h3>حدّد السياق</h3><p>نوع العقد، وهل وقّعت عليه أم لا، وصفتك: فرد أو قانوني.</p></div>
+<div class="stp"><b>٢</b><h3>ارفع العقد</h3><p>ملف PDF أو Word أو صور واضحة للصفحات.</p></div>
+<div class="stp"><b>٣</b><h3>قراءة وفحص</h3><p>استخراج البنود ومطابقتها بالمصادر القانونية.</p></div>
+<div class="stp"><b>٤</b><h3>تقرير مفصّل</h3><p>مخاطر مرتبة، وسبب كل خطر، وأثره، والخطوة التالية.</p></div></div></div></section>
+
+<section class="s" id="tool"><div class="c"><div class="sh"><span class="eyebrow">ابدأ الآن</span><h2>اختر الخدمة</h2></div>
+<div class="note" id="trialBanner" role="status" style="margin:0 0 18px;border:1px solid #d97706;background:rgba(245,158,11,.12);color:var(--fg)"><span>⚠️</span><span><b>نسخة تجريبية أكاديمية:</b> هذه المنصة لأغراض العرض والتجربة فقط — لا ترفع أسماء أو أرقامًا قومية أو عناوين أو بيانات شخصية حقيقية، واستخدم بيانات تجريبية فقط.</span></div>
+<div class="tabs" id="tabs"><button class="tab on" data-t="review">مراجعة عقد</button><button class="tab" data-t="draft">صياغة عقد</button><button class="tab" data-t="research">بحث قانوني</button><button class="tab" data-t="translate">ترجمة عقد</button></div>
+
+<div id="pReview"><div id="setup" class="two">
+<div class="card"><label class="lb">صفتك</label><div class="seg" data-k="role"><button class="on" data-v="المستأجر">المستأجر</button><button data-v="المؤجر">المؤجر</button><button data-v="المشتري">المشتري</button><button data-v="البائع">البائع</button></div>
+<label class="lb">نوع العقد</label><div class="seg" data-k="type"><button class="on" data-v="عقد إيجار سكني">إيجار سكني</button><button data-v="عقد بيع سيارة">بيع سيارة</button></div>
+<label class="lb">حالة العقد</label><div class="seg" data-k="status"><button class="on" data-v="قبل التوقيع">لم أوقّع بعد</button><button data-v="بعد التوقيع">وقّعت بالفعل</button></div>
+<label class="chk"><input type="checkbox" id="web" disabled><span>السماح بالبحث الخارجي عندما لا تكفي المصادر الداخلية (غير متاح حاليًا). تُوسَم أي نتيجة خارجية بعبارة «يحتاج تحققًا».</span></label></div>
+<div class="card"><label class="lb">ملف العقد</label>
+<div class="drop" id="drop"><strong id="fn">اسحب الملف إلى هنا</strong><span id="fh">PDF أو Word أو صورة — حتى ٢٠ ميجابايت</span><br><input id="fi" type="file" class="h" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"><button type="button" class="btn o" id="contractFileBtn">اختيار ملف</button></div>
+<label class="lb">نص العقد (اختياري — يمكنك رفع ملف بدلًا منه)</label><textarea id="ct" style="min-height:90px"></textarea>
+<div class="note"><span>🔒</span><span>يُستخدم الملف لإعداد مراجعتك فقط، ولا يُعرض على مستخدمين آخرين.</span></div>
+<button class="btn" id="go" style="width:100%;justify-content:center;margin-top:16px" disabled onclick="run()">ارفع ملف العقد أو الصق نصه للمتابعة</button></div></div>
+<div id="prog" class="h"><ol class="prog" id="pl"></ol></div>
+<div id="rep" class="h"></div></div>
+
+<div id="pOther" class="h"><div class="card" style="max-width:760px"><label class="lb" id="oL"></label><textarea id="oT"></textarea>
+<div id="oX"></div><button class="btn" style="margin-top:16px" onclick="sendOther()">إرسال</button></div><div id="oR" class="card h rich" style="max-width:760px;margin-top:16px;white-space:pre-wrap"></div></div>
+</div></section>
+
+<section class="s h" id="hist"><div class="c"><div class="sh"><span class="eyebrow">حسابي</span><h2 class="tkh" role="button" tabindex="0" aria-expanded="true" aria-controls="hBody" onclick="tkToggle(this,'hBody')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkToggle(this,'hBody')}">سجلّي</h2><p>مراجعاتك وصياغاتك وأبحاثك ومحادثاتك المحفوظة. لا يراها غيرك، ويمكنك حذف أي عنصر.</p></div>
+<div id="hBody"><div class="seg" data-k="hf" id="hs" style="max-width:600px;margin-bottom:16px"><button class="on" data-v="all">الكل</button><button data-v="review">المراجعات</button><button data-v="draft">الصياغة</button><button data-v="research">الأبحاث</button><button data-v="chat">المحادثات</button></div>
+<div id="hl"></div></div></div></section>
+
+<section class="s" id="chat"><div class="c"><div class="sh"><span class="eyebrow">المساعد</span><h2>اسأل المساعد القانوني</h2><p>اسأل عن بند في عقدك أو عن مسألة قانونية، ويأتيك الرد بالأسلوب المناسب لك.</p></div>
+<div class="card" style="max-width:820px"><div class="two" style="gap:12px;margin-bottom:14px"><div><label class="lb">أسلوب الإجابة</label><div class="seg" id="cA" data-k="ca"><button class="on" data-v="general">مبسّط للشخص العادي</button><button data-v="legal">مهني للقانوني</button></div></div>
+<div><label class="lb">نوع السؤال</label><div class="seg" id="cK" data-k="ck"><button class="on" data-v="contract">سؤال عن عقد</button><button data-v="research">بحث قانوني</button></div></div></div>
+<div class="msgs" id="msgs"><div class="m b">اكتب سؤالك أو اختر مثالًا. الردود للتوعية وليست استشارة قانونية.</div></div><div class="chips" id="chips"></div>
+<div class="cin"><textarea id="cm" rows="2"></textarea><button class="btn" onclick="ask()">إرسال</button></div>
+<label class="chk"><input type="checkbox" id="cw" disabled><span>اسمح بالبحث الخارجي عند الحاجة — غير متاح حاليًا (يُوسَم «يحتاج تحققًا»).</span></label></div></div></section>
+
+<section class="s alt" id="explain"><div class="c"><div class="sh"><span class="eyebrow">شرح مبسّط</span><h2>مصطلحات العقود بكلمات بسيطة</h2><p>معلومات عامة للتوعية، وتختلف تفاصيلها حسب نص كل عقد وظروفه.</p></div>
+<div style="max-width:820px">
+<details open><summary>مبلغ التأمين</summary><div>مبلغ يدفعه المستأجر ضمانًا لسداد الأجرة وإصلاح أي تلفيات، ويُرد عند انتهاء العقد بعد خصم المستحق فقط. <b>انتبه</b> إلى مدة الرد ومعايير الخصم وكيفية إثبات حالة الوحدة عند التسليم.</div></details>
+<details><summary>التجديد التلقائي</summary><div>بند يجعل العقد يمتد لمدة جديدة ما لم يُخطر أحد الطرفين الآخر. <b>انتبه</b> إلى مهلة الإخطار وطريقته؛ فغيابهما يفتح باب النزاع. وبوجه عام قد يُعتبر الإيجار متجددًا إذا استمر المستأجر في الانتفاع بعلم المؤجر دون اعتراض.</div></details>
+<details><summary>الشرط الجزائي (التعويض الاتفاقي)</summary><div>تعويض يتفق عليه الطرفان مسبقًا عند الإخلال بالعقد. <b>انتبه</b> إلى مقداره؛ فللقاضي أن يخفضه إذا ثبت أنه مبالغ فيه.</div></details>
+<details><summary>الفرق بين العقد الموقّع والعقد الذي لم يُوقَّع</summary><div>قبل التوقيع يمكنك التفاوض وطلب التعديل. بعد التوقيع يصبح العقد ملزمًا، فيتحول الهدف إلى فهم التزاماتك وتوثيق المراسلات والمواعيد ومعالجة المخاطر القائمة.</div></details>
+<details><summary>هل التقرير بديل عن المحامي؟</summary><div>لا. المراجعة الأولية تساعدك على الفهم واتخاذ القرار، وتبقى القضايا الكبيرة أو المعقدة بحاجة إلى محامٍ مختص.</div></details>
+</div></div></section>
+
+<section class="s alt" id="support"><div class="c"><div class="sh"><span class="eyebrow">الدعم</span><h2>تواصل مع فريق الدعم</h2><p>اكتب مشكلتك أو ملاحظتك وسنرد على بريدك. نرفق تلقائيًا بيانات تقنية بسيطة تساعدنا على حلّها أسرع.</p></div>
+<div class="sup"><div class="card"><label class="lb">نوع المشكلة</label><select id="sC"><option value="review">مراجعة العقود</option><option value="draft">الصياغة</option><option value="research">البحث القانوني</option><option value="translate">الترجمة</option><option value="account">الحساب وتسجيل الدخول</option><option value="other">أخرى</option></select>
+<label class="lb">الموضوع</label><input id="sS" maxlength="120"><label class="lb">رسالتك</label><textarea id="sM" maxlength="4000"></textarea>
+<p class="sm">بإرسال الرسالة فأنت تطّلع على <a href="assets/policy.pdf" class="pol" target="_blank" rel="noopener" style="text-decoration:underline">سياسة الخصوصية وشروط الاستخدام</a>.</p><div class="msg" id="sMsg" role="alert"></div><button class="btn" id="sB" style="margin-top:14px" onclick="sendSupport()">إرسال إلى الدعم</button></div>
+<div class="card"><div class="tkh" role="button" tabindex="0" aria-expanded="true" aria-controls="sL" onclick="tkToggle(this,'sL')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();tkToggle(this,'sL')}"><h3 style="margin:0">تذاكري</h3><span class="tkc" id="tkc"></span></div><div id="sL" class="sm">سجّل الدخول لمتابعة تذاكرك.</div></div></div></div></section>
+<section class="s" id="trust"><div class="c"><div class="sh"><span class="eyebrow">الثقة</span><h2>مصادر موثقة وخصوصية محفوظة</h2></div>
+<div class="grid3">
+<div class="card"><h3>مكتبة داخلية أولًا</h3><p style="color:var(--muted);margin:6px 0 0">تبدأ كل مراجعة من مكتبة المصادر القانونية الخاصة بالمنصة، وتُنسب كل ملاحظة إلى مصدرها.</p></div>
+<div class="card"><h3>بحث خارجي مشروط</h3><p style="color:var(--muted);margin:6px 0 0">لا يُستخدم الويب إلا عند الحاجة وبموافقتك، وتظهر نتائجه بوسم «مصدر خارجي — يحتاج تحققًا».</p></div>
+<div class="card"><h3>خصوصية ملفاتك</h3><p style="color:var(--muted);margin:6px 0 0">ملفاتك تُستخدم لإعداد مراجعتك فقط، ولا تُعرض على أي مستخدم آخر.</p></div></div></div></section>
+</main>
+
+<footer><div class="c"><div class="brand"><span class="mk">م</span><span data-brand></span></div>
+<p><b>تنبيه قانوني:</b> المحتوى والتقارير الصادرة عن المنصة مراجعة أولية للتوعية والفهم، وليست استشارة قانونية ولا تنشئ علاقة بين محامٍ وموكل. يُنصح بالرجوع إلى محامٍ مختص قبل اتخاذ قرارات جوهرية.</p>
+<p><a href="assets/policy.pdf" class="pol" target="_blank" rel="noopener" style="text-decoration:underline">سياسة الخصوصية وشروط الاستخدام</a></p>
+<p class="l">© <span id="yr"></span> <span data-brand></span> — جميع الحقوق محفوظة.</p></div></footer>
+<div class="ov" id="ov" role="dialog" aria-modal="true" aria-labelledby="amT"><div class="mdl">
+<button class="x" id="ax" aria-label="Close">×</button><h3 id="amT">الدخول إلى حسابك</h3><p class="sm" id="aN"></p>
+<div class="seg" data-k="am"><button class="on" data-v="in">تسجيل الدخول</button><button data-v="up">حساب جديد</button></div>
+<div data-s="up"><label class="lb">الاسم الكامل</label><input id="an" autocomplete="name"></div>
+<label class="lb">البريد الإلكتروني</label><input id="ae" type="email" dir="ltr" autocomplete="email">
+<label class="lb">كلمة السر</label><input id="ap" type="password" dir="ltr" autocomplete="current-password">
+<p class="sm" data-s="up">8 أحرف على الأقل. بالتسجيل توافق على أن مخرجات المنصة مراجعة أولية وليست استشارة قانونية.</p>
+<label class="chk" data-s="up"><input type="checkbox" id="ct1" style="width:auto;min-height:0"><span>أوافق على شروط الاستخدام (<a href="assets/policy.pdf" class="pol" target="_blank" rel="noopener" style="text-decoration:underline">سياسة الخصوصية وشروط الاستخدام</a>).</span></label>
+<label class="chk" data-s="up"><input type="checkbox" id="ct2" style="width:auto;min-height:0"><span>أقرّ بأنني اطّلعت على سياسة الخصوصية.</span></label>
+<div class="msg" id="am" role="alert"></div>
+<button class="btn" id="as" style="width:100%;justify-content:center;margin-top:14px" onclick="authGo()">دخول</button>
+<button class="lk" id="af" onclick="authForgot()">هل نسيت كلمة المرور؟</button>
+<div id="resetBox" class="h" style="margin-top:14px">
+<label class="lb">كلمة السر الجديدة</label><input id="rp1" type="password" dir="ltr" autocomplete="new-password">
+<label class="lb">تأكيد كلمة السر الجديدة</label><input id="rp2" type="password" dir="ltr" autocomplete="new-password">
+<div class="msg" id="rm" role="alert"></div>
+<button class="btn" id="ru" style="width:100%;justify-content:center;margin-top:14px" onclick="updatePassword()">حفظ كلمة السر الجديدة</button>
+</div></div></div>
+<div class="toast" id="toast"></div>
+
+
+<button class="fab" id="fab" type="button" onclick="go('chat');setTimeout(function(){var c=document.getElementById('cm');if(c)c.focus()},600)"><span style="font-size:18px">💬</span><span>اسأل المساعد</span></button>
+<script src="js/config.js"></script>
+<script src="js/00-errlog.js"></script>
+<script src="js/01-core.js"></script>
+<script src="js/02-tool.js"></script>
+<script src="js/03-i18n.js"></script>
+<script src="js/04-api-analysis.js"></script>
+<script src="js/05-drafting-chat.js"></script>
+<script src="js/06-auth.js"></script>
+<script src="js/07-history-support.js"></script>
+<script src="js/08-diagnostics-layout.js"></script>
+<script src="js/09-bootstrap.js"></script>
+<script src="js/policy-pdf-data.js"></script>
+<script src="js/policy.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "name": "muhkam",
+  "version": "1.1.1",
+  "description": "Muhkam — Arabic legal platform (static frontend + 8 n8n workflows + Supabase)",
+  "private": true,
+  "scripts": {
+    "lint:js": "eslint js/0*.js js/config.js js/policy.js && node scripts/check-syntax.js",
+    "lint:json": "node scripts/validate-workflows.js",
+    "format": "prettier --write \"js/0*.js\" js/config.js js/policy.js css/style.css",
+    "format:check": "node scripts/check-format.js",
+    "test": "node --test tests/smoke.test.js",
+    "check": "npm run lint:js && npm run format:check && npm run lint:json && npm test"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jsdom": "^26.0.0",
+    "prettier": "^3.3.0"
+  }
+}

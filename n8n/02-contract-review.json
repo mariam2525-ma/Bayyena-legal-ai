@@ -1,0 +1,1019 @@
+{
+  "name": "Workflow 3 - Contract Review (Webhook + OCR Fixed) — Gemini 3.1 Flash-Lite",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legal-ai/review",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', job_id: $('Webhook').first().json.body.job_id || null } }}",
+        "options": {}
+      },
+      "name": "Ack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        640,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// يحوّل جسم الـ Webhook إلى شكل موحّد ويحدد نوع الملف المرفوع (إن وُجد)\nconst w = $('Webhook').first();\nconst u = $('Verify User').first().json;\nconst bin = w.binary || {};\nconst keys = Object.keys(bin);\nlet file_kind = 'none';\nlet binary;\nif (keys.length > 0) {\n  const b = bin[keys[0]];\n  const name = String(b.fileName || '').toLowerCase();\n  const mime = String(b.mimeType || '').toLowerCase();\n  if (mime.includes('pdf') || name.endsWith('.pdf') || mime.startsWith('image/') || /\\.(jpe?g|png)$/.test(name)) file_kind = 'media';\n  else if (mime.includes('wordprocessingml') || name.endsWith('.docx')) file_kind = 'docx';\n  else file_kind = 'other';\n  binary = { data: b };\n}\nconst item = { json: { ...(w.json.body || {}), user_id: u.id, user_email: u.email, file_kind } };\nif (binary) item.binary = binary;\nreturn [item];"
+      },
+      "name": "Upload Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        160
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "media"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "media"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.file_kind }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "docx"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "docx"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "text-or-none"
+        }
+      },
+      "name": "Route File Kind",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        496
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const it = $input.first();\nconst b = it.binary.data;\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nlet mime = String(b.mimeType || '').toLowerCase();\nconst name = String(b.fileName || '').toLowerCase();\nif (!mime || mime === 'application/octet-stream') {\n  if (name.endsWith('.pdf')) mime = 'application/pdf';\n  else if (/\\.jpe?g$/.test(name)) mime = 'image/jpeg';\n  else if (name.endsWith('.png')) mime = 'image/png';\n}\nreturn [{ json: { ...it.json, file_b64: buf.toString('base64'), file_mime: mime, ocr_prompt: 'اقرأ كل النص الظاهر في الملف بدقة، بما في ذلك النص الموجود داخل الصور، مع الحفاظ على ترتيب الفقرات وترقيم البنود والأرقام والتواريخ والمبالغ، وأعد النص فقط دون تلخيص.' } }];"
+      },
+      "name": "File to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: $json.ocr_prompt || \"أنت أداة OCR لعقد قانوني. اقرأ النص الظاهر في الملف، بما في ذلك الصفحات المصورة، وانسخه كاملًا بنفس الترتيب والترقيم دون تعليق أو تلخيص أو إضافة. أعد النص فقط.\" }, { inline_data: { mime_type: $json.file_mime, data: $json.file_b64 } }] }], generationConfig: { temperature: 0, maxOutputTokens: 50000 } }) }}",
+        "options": {
+          "timeout": 240000
+        }
+      },
+      "name": "Gemini Read File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1584,
+        496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Upload Contract').first().json;\n// n8n قد يعيد استجابة HTTP مباشرة أو داخل body، لذلك نقرأ الشكلين.\nconst response = ($json && $json.body && typeof $json.body === 'object') ? $json.body : ($json || {});\nconst candidates = Array.isArray(response.candidates) ? response.candidates : [];\nlet text = candidates\n  .flatMap(c => (c.content && Array.isArray(c.content.parts)) ? c.content.parts : [])\n  .filter(p => typeof p.text === 'string' && !p.thought)\n  .map(p => p.text)\n  .join('')\n  .trim();\n// دعم استجابات Gemini المبسطة أو أي wrapper محتمل من عقدة HTTP.\nif (!text && typeof response.text === 'string') text = response.text.trim();\nif (!text && typeof response.output === 'string') text = response.output.trim();\nif (!text && typeof response.result === 'string') text = response.result.trim();\nif (!text && response.content && Array.isArray(response.content.parts)) {\n  text = response.content.parts.filter(p => typeof p.text === 'string').map(p => p.text).join('').trim();\n}\nconst finish = candidates[0]?.finishReason || '';\nlet error = '';\nif (!text) {\n  error = finish ? 'تعذر استخراج النص من الملف عبر OCR. سبب Gemini: ' + finish : 'تعذر استخراج نص من الملف المرفوع عبر OCR. تأكد أن صفحات الملف واضحة وأن عقدة Gemini متصلة باعتماد صحيح.';\n}\nreturn [{ json: { ...base, extracted_text: text, file_error: error, ocr_used: true } }];"
+      },
+      "name": "Collect File Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1808,
+        496
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst pick = (a, b) => (j[a] !== undefined ? j[a] : j[b]) || '';\nconst contractType = String(pick('contract_type', 'نوع العقد')).trim();\nconst userRole = String(pick('user_role', 'صفة المستخدم')).trim();\nlet typed = String(pick('contract_text', 'نص العقد'));\n\nlet fileText = '';\nlet fileNote = '';\nconst binary = $input.item.binary || {};\nfor (const key of Object.keys(binary)) {\n  const meta = binary[key];\n  const mime = (meta.mimeType || '').toLowerCase();\n  const fname = meta.fileName || key;\n  if (mime.startsWith('text/') || fname.toLowerCase().endsWith('.txt')) {\n    try {\n      const buf = await this.helpers.getBinaryDataBuffer($itemIndex, key);\n      fileText += '\\n' + buf.toString('utf8');\n    } catch (e) {\n      fileNote += 'تعذر قراءة الملف ' + fname + '. ';\n    }\n  } else if (mime.includes('pdf')) {\n    try {\n      const raw = (await this.helpers.getBinaryDataBuffer($itemIndex, key)).toString('latin1');\n      const parts = [];\n      const re = /\\(((?:\\\\.|[^\\\\)])*)\\)\\s*Tj/g;\n      let m;\n      while ((m = re.exec(raw)) !== null) parts.push(m[1]);\n      if (parts.length > 20) fileText += '\\n' + parts.join(' ');\n      else fileNote += 'تم استلام ملف PDF (' + fname + ') والاعتماد على النص المُدخل. ';\n    } catch (e) {\n      fileNote += 'تعذر قراءة الملف ' + fname + '. ';\n    }\n  } else {\n    fileNote += 'تم استلام الملف ' + fname + ' والاعتماد على النص المُدخل. ';\n  }\n}\n\nconst extra = String(j.extracted_text || '');\nif (extra) fileText += '\\n' + extra;\nif (j.file_error) fileNote += j.file_error + ' ';\n\nconst clean = (s) => s\n  .replace(/\\r\\n/g, '\\n')\n  .replace(/[\\u200B-\\u200F\\u202A-\\u202E\\uFEFF]/g, '')\n  .replace(/[ \\t]+/g, ' ')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\ntyped = clean(typed);\nfileText = clean(fileText);\nlet contractText = typed;\nif (fileText && !typed.includes(fileText.slice(0, 200))) {\n  contractText = typed ? typed + '\\n\\n--- نص مستخرج من الملف المرفق ---\\n' + fileText : fileText;\n}\n\nreturn { json: { contract_type: contractType, user_role: userRole, contract_text: contractText, file_note: fileNote.trim(), char_count: contractText.length, has_text: contractText.length >= 30 } };"
+      },
+      "name": "Extract Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        512
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.has_text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Has Text?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        704,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $json.contract_type }}\nصفة المستخدم: {{ $json.user_role }}\n\nنص العقد الكامل:\n\"\"\"\n{{ $json.contract_text }}\n\"\"\"",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت محامٍ مصري خبير في صياغة وتحليل العقود المدنية. مهمتك تفكيك العقد إلى بنود منظمة ومرقمة بدقة دون إضافة أي محتوى غير موجود في النص.\nقسّم العقد تحت العناوين التالية (اذكر \"غير مذكور في العقد\" إن لم يوجد ما يقابله):\n1. الأطراف (الأسماء، الصفة، بيانات الهوية والعناوين)\n2. محل العقد (وصف السيارة: الماركة، الموديل، رقم الشاسيه والموتور واللوحات / أو وصف العين المؤجرة وعنوانها)\n3. المدة والتواريخ (مدة الإيجار وبدايتها ونهايتها / موعد التسليم الفعلي ونقل الملكية)\n4. الالتزامات المالية (الثمن أو الأجرة، طريقة وموعد السداد، التأمين، الزيادات، المقدم والأقساط)\n5. التزامات الطرف الأول\n6. التزامات الطرف الثاني\n7. المسؤولية والإخلال والشرط الجزائي والفسخ\n8. القانون الواجب التطبيق والمحكمة المختصة\n9. بنود أخرى\nلكل بند: رقم مرجعي (B1، B2...)، العنوان، النص الحرفي المقتبس من العقد، وتلخيص موجز. اكتب بالعربية الفصحى في صورة نص منظم واضح."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Extract Clauses",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1360,
+        160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Extract Clauses",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Extract Text').item.json.contract_type }}\nصفة المستخدم: {{ $('Extract Text').item.json.user_role }}\n\nالبنود المستخرجة من العقد:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت باحث قانوني مصري متخصص. استخرج المعايير والقواعد القانونية المصرية الحاكمة لنوع العقد المذكور، مع ذكر المادة والقانون كلما أمكن، وأمثلة عملية لصياغات نموذجية متوازنة.\n- إذا كان العقد \"عقد بيع سيارة\": طبّق القانون المدني المصري (أحكام البيع، الالتزام بالتسليم، ضمان العيوب الخفية المواد 447 وما بعدها، تبعة الهلاك قبل التسليم) وقانون المرور رقم 66 لسنة 1973 وتعديلاته (نقل الملكية والترخيص بوحدة المرور، التوكيلات، توقيت التسليم الفعلي، توزيع المخالفات المرورية والمسؤولية المدنية والجنائية قبل التسليم وبعده، محضر التسليم بالساعة والتاريخ وقراءة العداد).\n- إذا كان العقد \"عقد إيجار سكني\": طبّق القانون رقم 4 لسنة 1996 (خضوع العقد لأحكام القانون المدني وانتهاؤه بانتهاء مدته) والقانون المدني المصري (المواد 558 وما بعدها: الإخلاء بانتهاء المدة، رد التأمين، تسوية فواتير المرافق، غرامات التأخير، الصيانة والترميمات، التنبيه بالإخلاء، الامتداد والتجديد، التنازل والتأجير من الباطن)، مع الإشارة إلى أي قواعد حديثة ذات صلة إن وجدت.\nقسّم الإجابة: (أ) القواعد القانونية الآمرة، (ب) القواعد المكمّلة المعتادة، (ج) نقاط الحماية الخاصة بصفة المستخدم، (د) أمثلة صياغات نموذجية. لا تخترع أرقام مواد إن لم تكن متأكدًا؛ اذكر المبدأ القانوني بدلًا من ذلك."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Retrieve Laws and Examples",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1712,
+        160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Retrieve Laws",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1792,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Extract Text').item.json.contract_type }}\nصفة المستخدم: {{ $('Extract Text').item.json.user_role }}\n\nالبنود المستخرجة:\n{{ $('Extract Clauses').item.json.text }}\n\nالمعايير القانونية المصرية:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت محامٍ مصري يدافع عن مصلحة المستخدم بحسب صفته (المشتري/البائع/المستأجر/المؤجر). حلّل كل بند من منظور المستخدم وصنّف المخاطر وفق القانون المصري إلى: عالية، متوسطة، منخفضة.\nأخرج الناتج بصيغة HTML فقط (بدون Markdown وبدون علامات ```) على جزأين يفصل بينهما سطر يحتوي فقط على: ===TABLE===\nالجزء الأول: ملخص تقييم العقد داخل عناصر <p> و<ul>: التقييم العام، درجة توازن العقد من 10، عدد المخاطر لكل مستوى، وأهم 3 توصيات عاجلة.\nالجزء الثاني: جدول واحد <table> بالأعمدة: رقم البند | البند | نص/وصف المشكلة | مستوى الخطورة | السند القانوني | الأثر على المستخدم.\nفي عمود مستوى الخطورة استخدم حصريًا: <span class=\"high\">عالية</span> أو <span class=\"medium\">متوسطة</span> أو <span class=\"low\">منخفضة</span>. رتّب الصفوف من الأعلى خطورة إلى الأقل."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Risk Analysis",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2064,
+        160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Risk Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2144,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Extract Text').item.json.contract_type }}\nصفة المستخدم: {{ $('Extract Text').item.json.user_role }}\n\nالبنود المستخرجة:\n{{ $('Extract Clauses').item.json.text }}\n\nالمعايير القانونية المصرية:\n{{ $('Retrieve Laws and Examples').item.json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت محامٍ مصري خبير. حدّد البنود الجوهرية والقانونية والحمائية الغائبة عن العقد والتي يتطلبها القانون المصري أو العرف القانوني لهذا النوع من العقود، مع التركيز على حماية المستخدم بحسب صفته.\nأخرج الناتج بصيغة HTML فقط (بدون Markdown وبدون علامات ```) كجدول <table> بالأعمدة: م | البند الغائب | سبب أهميته | السند القانوني | الأولوية.\nفي عمود الأولوية استخدم: <span class=\"high\">عالية</span> أو <span class=\"medium\">متوسطة</span> أو <span class=\"low\">منخفضة</span>. لا تكرر بنودًا موجودة فعلًا في العقد."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Missing Clauses",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2416,
+        160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Missing Clauses",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2496,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Extract Text').item.json.contract_type }}\nصفة المستخدم: {{ $('Extract Text').item.json.user_role }}\n\nتحليل المخاطر:\n{{ $('Risk Analysis').item.json.text }}\n\nالبنود الغائبة:\n{{ $json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت محامٍ مصري متخصص في الصياغة القانونية. لكل بند ذي خطورة عالية أو متوسطة، ولكل بند غائب، قدّم صياغة بديلة دقيقة بلغة قانونية مصرية رصينة جاهزة للإدراج في العقد.\nأخرج الناتج بصيغة HTML فقط (بدون Markdown وبدون علامات ```). لكل تعديل استخدم البنية:\n<div class=\"amend\"><h4>رقم البند — العنوان</h4><p class=\"old\"><b>النص الحالي:</b> ... (أو \"بند غير موجود\")</p><p class=\"new\"><b>الصياغة المقترحة:</b> ...</p><p class=\"why\"><b>المبرر:</b> ...</p></div>"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Suggested Amendments",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        2768,
+        160
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 16384,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Suggested Amendments",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2848,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const strip = s => String(s || '').replace(/```(html)?/g, '');\nconst esc = s => String(s || '').replace(/[&<>\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));\nconst ex = $('Extract Text').first().json;\nconst risk = strip($('Risk Analysis').first().json.text).split('===TABLE===');\nconst missing = strip($('Missing Clauses').first().json.text);\nconst amend = strip($input.first().json.text);\nconst date = $now.setZone('Africa/Cairo').toFormat('yyyy-MM-dd');\nconst css = \"\\nbody{font-family:Tahoma,Arial,sans-serif;background:#f4f6f9;color:#1f2937;margin:0;padding:24px;line-height:1.8}\\n.wrap{max-width:1000px;margin:auto;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.08);overflow:hidden}\\nheader{background:#0f2b46;color:#fff;padding:24px 32px}header h1{margin:0;font-size:26px}header p{margin:4px 0 0;color:#cbd5e1}\\nsection{padding:20px 32px;border-bottom:1px solid #e5e7eb}h2{color:#0f2b46;border-right:5px solid #c8a24a;padding-right:10px}\\ntable{width:100%;border-collapse:collapse;font-size:14px}th{background:#0f2b46;color:#fff;padding:8px}td{border:1px solid #e5e7eb;padding:8px;vertical-align:top}tr:nth-child(even) td{background:#f9fafb}\\n.high{background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-weight:bold}.medium{background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:6px;font-weight:bold}.low{background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:6px;font-weight:bold}\\n.amend{border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:12px}.old{background:#fef2f2;padding:8px;border-radius:6px}.new{background:#f0fdf4;padding:8px;border-radius:6px}\\nfooter{padding:16px 32px;font-size:12px;color:#6b7280}\\n\";\nconst html = `<!DOCTYPE html>\n<html lang=\"ar\" dir=\"rtl\"><head><meta charset=\"utf-8\"><title>مُحكَم — تقرير التدقيق القانوني</title>\n<style>${css}</style></head><body><div class=\"wrap\">\n<header><h1>مُحكَم — تقرير التدقيق القانوني للعقد</h1><p>نوع العقد: ${esc(ex.contract_type)} | صفة المستخدم: ${esc(ex.user_role)} | التاريخ: ${date}</p></header>\n<section><h2>ملخص تقييم العقد</h2>${risk[0] || ''}</section>\n<section><h2>جدول المخاطر القانونية والبنود المجحفة</h2>${risk[1] || ''}</section>\n<section><h2>البنود الجوهرية الغائبة</h2>${missing}</section>\n<section><h2>الصياغات البديلة الموصى بها</h2>${amend}</section>\n<footer>هذا التقرير صادر آليًا لأغراض استرشادية ولا يغني عن استشارة محامٍ مختص.</footer>\n</div></body></html>`;\nreturn [{ json: { status: 'done', report: html, error: null } }];"
+      },
+      "name": "Build Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        160
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dcuowxwpihkvqxbkpsxp.supabase.co/rest/v1/review_jobs?id=eq.{{ $('Webhook').first().json.body.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Webhook').first().json.headers.authorization || '' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, report: $json.report, error: $json.error }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Save Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3392,
+        160
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'error', report: null, error: 'لم نتمكن من قراءة نص العقد. ارفع ملف PDF أو Word أو صورة أوضح، أو الصق نص العقد في الخانة المخصصة.' } }];"
+      },
+      "name": "No Text Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        240
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "name": "Unzip DOCX",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        1360,
+        720
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Upload Contract').first().json;\nconst bin = $input.first().binary || {};\nconst keys = Object.keys(bin);\nlet key = keys.find(k => bin[k].fileName === 'document.xml' && String(bin[k].directory || '').includes('word'));\nif (!key) key = keys.find(k => bin[k].fileName === 'document.xml');\nif (!key) return [{ json: { ...base, extracted_text: '', file_error: 'تعذّر قراءة ملف Word.' } }];\nconst buffer = await this.helpers.getBinaryDataBuffer(0, key);\nconst text = buffer.toString('utf8')\n  .replace(/<w:tab\\/>/g, '\\t')\n  .replace(/<w:br[^>]*\\/>/g, '\\n')\n  .replace(/<\\/w:p>/g, '\\n')\n  .replace(/<[^>]+>/g, '')\n  .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&apos;/g, \"'\").replace(/&amp;/g, '&')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\nreturn [{ json: { ...base, extracted_text: text, file_error: text ? '' : 'ملف Word لا يحتوي على نص.' } }];"
+      },
+      "name": "Read DOCX Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        720
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'error', report: null, error: 'تعذّر إكمال المعالجة بسبب خطأ مؤقت. أعد المحاولة، وإن تكرر الأمر تواصل مع الدعم.' } }];"
+      },
+      "name": "Processing Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3168,
+        420
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack": {
+      "main": [
+        [
+          {
+            "node": "Upload Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Contract": {
+      "main": [
+        [
+          {
+            "node": "Route File Kind",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route File Kind": {
+      "main": [
+        [
+          {
+            "node": "File to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unzip DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File to Base64": {
+      "main": [
+        [
+          {
+            "node": "Gemini Read File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Read File": {
+      "main": [
+        [
+          {
+            "node": "Collect File Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect File Text": {
+      "main": [
+        [
+          {
+            "node": "Extract Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text": {
+      "main": [
+        [
+          {
+            "node": "Has Text?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Text?": {
+      "main": [
+        [
+          {
+            "node": "Extract Clauses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Text Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Clauses": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Laws and Examples",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Extract Clauses": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract Clauses",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Laws and Examples": {
+      "main": [
+        [
+          {
+            "node": "Risk Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Retrieve Laws": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Retrieve Laws and Examples",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Analysis": {
+      "main": [
+        [
+          {
+            "node": "Missing Clauses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Risk Analysis": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Risk Analysis",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Missing Clauses": {
+      "main": [
+        [
+          {
+            "node": "Suggested Amendments",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Missing Clauses": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Missing Clauses",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Suggested Amendments": {
+      "main": [
+        [
+          {
+            "node": "Build Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Suggested Amendments": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Suggested Amendments",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Report": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Text Error": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip DOCX": {
+      "main": [
+        [
+          {
+            "node": "Read DOCX Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read DOCX Text": {
+      "main": [
+        [
+          {
+            "node": "Extract Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Error": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

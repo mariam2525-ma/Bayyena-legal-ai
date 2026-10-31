@@ -1,0 +1,82 @@
+{
+  "env": {
+    "browser": true,
+    "es6": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "script"
+  },
+  "globals": {
+    "$": "readonly",
+    "$$": "readonly",
+    "AUTH": "readonly",
+    "AUTH_HEADERS": "readonly",
+    "CONFIG": "readonly",
+    "EK": "readonly",
+    "EN": "readonly",
+    "ERRLOG": "readonly",
+    "OT": "readonly",
+    "POLICY_VER": "readonly",
+    "APP_STATE": "readonly",
+    "SES": "readonly",
+    "WH": "readonly",
+    "add": "readonly",
+    "addSources": "readonly",
+    "amSync": "readonly",
+    "analyze": "readonly",
+    "applyLang": "readonly",
+    "ask": "readonly",
+    "chips": "readonly",
+    "consumeRecoveryLink": "readonly",
+    "esc": "readonly",
+    "getTok": "readonly",
+    "goSync": "readonly",
+    "hook": "readonly",
+    "hookAsync": "readonly",
+    "lang": "readonly",
+    "loadH": "readonly",
+    "loadTk": "readonly",
+    "needAuth": "readonly",
+    "openAuth": "readonly",
+    "pick": "readonly",
+    "rawTxt": "readonly",
+    "readTxt": "readonly",
+    "render": "readonly",
+    "rest": "readonly",
+    "run": "readonly",
+    "saveH": "readonly",
+    "sendOther": "readonly",
+    "show": "readonly",
+    "showExternal": "readonly",
+    "sourceLabel": "readonly",
+    "sourceLink": "readonly",
+    "syncRole": "readonly",
+    "t": "readonly",
+    "tab": "readonly",
+    "toast": "readonly",
+    "tr": "readonly",
+    "extractPlainText": "readonly",
+    "uiAuth": "readonly"
+  },
+  "rules": {
+    "no-undef": "error",
+    "no-unused-vars": [
+      "error",
+      {
+        "args": "after-used",
+        "caughtErrors": "none",
+        "varsIgnorePattern": "^(?:POLICY_VER|CONFIG|\\$\\$|esc|toast|APP_STATE|go|run|showExternal|again|setLang|add|extractPlainText|hookAsync|analyze|readTxt|sendOther|getTok|acct|authForgot|updatePassword|consumeRecoveryLink|out|saveH|addSources|sendSupport|tkToggle|AUTH_HEADERS|AUTH)$"
+      }
+    ],
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "no-redeclare": "error",
+    "no-constant-condition": "error",
+    "no-dupe-keys": "error",
+    "no-duplicate-case": "error",
+    "no-unreachable": "error",
+    "use-isnan": "error",
+    "valid-typeof": "error"
+  }
+}

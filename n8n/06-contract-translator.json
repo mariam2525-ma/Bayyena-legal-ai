@@ -1,0 +1,855 @@
+{
+  "name": "Egyptian Legal Contract Translator (Hybrid + PDF OCR)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "translate-contract-hybrid",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "1. Webhook (Contract Upload)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const w = $('1. Webhook (Contract Upload)').first();\nconst bin = w.binary || {};\nconst keys = Object.keys(bin);\nconst body = w.json.body || {};\nif (keys.length > 0) {\n  const b = bin[keys[0]];\n  const name = String(b.fileName || '').toLowerCase();\n  const mime = String(b.mimeType || '').toLowerCase();\n  let inputType = 'unsupported';\n  if (mime.includes('pdf') || name.endsWith('.pdf')) inputType = 'pdf';\n  else if (mime.includes('wordprocessingml') || name.endsWith('.docx')) inputType = 'docx';\n  else if (mime.startsWith('text/') || name.endsWith('.txt')) inputType = 'textfile';\n  return [{ json: { inputType, fileName: b.fileName || '', text: '' }, binary: { data: b } }];\n}\nconst text = String(body.text || body.contract || '');\nreturn [{ json: { inputType: text.trim() ? 'text' : 'unsupported', fileName: '', text } }];"
+      },
+      "name": "2. Detect Input Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        704
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.inputType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "pdf"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "pdf"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.inputType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "docx"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "docx"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.inputType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "textfile"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "textfile"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 1
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.inputType }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "rightValue": "text"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "text"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Unsupported"
+        }
+      },
+      "name": "3. Route by Input Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1216,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {
+          "joinPages": true
+        }
+      },
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const text = String($json.text || '');\nconst body = $('1. Webhook (Contract Upload)').first().json.body || {};\n\nconst dictionary = {\n  'العين المؤجرة': 'Leased Property / Leased Premises',\n  'المؤجر': 'Lessor (First Party)',\n  'مؤجر': 'Lessor (First Party)',\n  'المستأجر': 'Lessee (Second Party)',\n  'مستأجر': 'Lessee (Second Party)',\n  'الطرف الأول': 'First Party',\n  'الطرف الثاني': 'Second Party',\n  'البائع': 'Seller',\n  'المشتري': 'Buyer',\n  'عقد إيجار': 'Lease Agreement',\n  'عقد بيع سيارة': 'Motor Vehicle Sale Agreement',\n  'القيمة الإيجارية': 'Rent',\n  'رقم الشاسيه': 'Chassis Number',\n  'رقم الشاسي': 'Chassis Number',\n  'رقم المحرك': 'Engine Number',\n  'الشرط الجزائي': 'Penalty Clause / Liquidated Damages',\n  'المحكمة المختصة': 'Competent Egyptian Court',\n  'فسخ العقد': 'Termination of the Contract',\n  'جنيه مصري': 'Egyptian Pounds (EGP)',\n  'عربون': 'Earnest Money',\n  'مبلغ التأمين': 'Security Deposit',\n  'مبلغ تأمين': 'Security Deposit'\n};\n\nconst matched = [];\nfor (const [ar, en] of Object.entries(dictionary)) {\n  if (text.includes(ar)) matched.push(ar + ' -> ' + en);\n}\nif (/القانون\\s*رقم\\s*\\(?\\s*4\\s*\\)?\\s*لسنة\\s*1996/.test(text)) matched.push('القانون رقم 4 لسنة 1996 -> Egyptian Law No. 4 of 1996 regarding Lease');\n\nconst arabicChars = (text.match(/[\\u0600-\\u06FF]/g) || []).length;\nconst latinChars = (text.match(/[A-Za-z]/g) || []).length;\nconst sourceLanguage = arabicChars >= latinChars ? 'Arabic' : 'English';\nconst requested = String(body.targetLanguage || body.targetLang || body.direction || '').toLowerCase();\nlet targetLanguage = sourceLanguage === 'Arabic' ? 'English' : 'Arabic';\nif (requested.startsWith('ar') || requested.includes('إلى العربية') || requested.includes('الى العربية')) targetLanguage = 'Arabic';\nif (requested.startsWith('en') || requested.includes('إلى الإنجليزية') || requested.includes('الى الانجليزية') || requested.includes('إلى الانجليزية')) targetLanguage = 'English';\n\nif (!text.trim()) throw new Error('No text could be extracted from the input. Scanned (image-only) PDFs are not supported.');\n\nreturn {\n  json: {\n    extractedText: text,\n    sourceLanguage,\n    targetLanguage,\n    matchedDictionary: matched.join('\\n') || 'No specific dictionary terms matched. Use standard Egyptian Civil Law terminology.'\n  }\n};"
+      },
+      "name": "4. Egyptian Legal Dictionary Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2096,
+        704
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "Gemini 3.5 Flash Lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Translate the following contract from {{ $json.sourceLanguage }} into {{ $json.targetLanguage }}.\n\nDICTIONARY CONTEXT (use these exact equivalents):\n{{ $json.matchedDictionary }}\n\nCONTRACT TEXT:\n{{ $json.extractedText }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "includeMergedResponse": true,
+          "systemMessage": "You are an expert Egyptian legal translator proficient in the Egyptian Civil Code (Law No. 131 of 1948) and Law No. 4 of 1996. Translate contracts accurately and completely: never omit, summarize or add clauses. Never alter numbers, dates, ID numbers, registration numbers, chassis/VIN numbers or amounts; write all numbers with Western digits (0-9) exactly as in the source. Do not translate proper names: transliterate them. Preserve clause/article numbering and keep one blank line between clauses, matching the source paragraph structure one-to-one. Use the supplied dictionary terms. Return ONLY the translated contract text, with no commentary.",
+          "maxOutputTokens": 32768,
+          "temperature": 0.2
+        }
+      },
+      "name": "5. AI Legal Translator (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2192,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parts = ($json.content && Array.isArray($json.content.parts)) ? $json.content.parts : [];\nconst translation = String($json.mergedResponse || parts.map(p => p.text || '').join('') || $json.text || '').trim();\nif (!translation) throw new Error('The AI model returned an empty translation.');\n\nconst targetLanguage = $('4. Egyptian Legal Dictionary Lookup').item.json.targetLanguage;\nconst dir = targetLanguage === 'Arabic' ? 'rtl' : 'ltr';\nconst lang = targetLanguage === 'Arabic' ? 'ar' : 'en';\nconst escaped = translation.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst html = '<!DOCTYPE html>\\n<html lang=\"' + lang + '\" dir=\"' + dir + '\">\\n<head>\\n<meta charset=\"utf-8\">\\n<style>\\n'\n  + \"body { font-family: 'Times New Roman', Arial, sans-serif; margin: 40px; line-height: 1.6; color: #111; }\\n\"\n  + '.contract-body { white-space: pre-wrap; font-size: 14pt; text-align: justify; }\\n'\n  + '</style>\\n</head>\\n<body>\\n<div class=\"contract-body\">' + escaped + '</div>\\n</body>\\n</html>';\n\nreturn { json: { translatedText: translation, targetLanguage, html } };"
+      },
+      "name": "6. Document Formatter (HTML)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        320
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {},
+      "name": "Unzip DOCX",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        1536,
+        512
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nconst items = $input.all();\nfor (let i = 0; i < items.length; i++) {\n  const bin = items[i].binary || {};\n  const keys = Object.keys(bin);\n  let key = keys.find(k => bin[k].fileName === 'document.xml' && String(bin[k].directory || '').includes('word'));\n  if (!key) key = keys.find(k => bin[k].fileName === 'document.xml');\n  if (!key) throw new Error('Could not find word/document.xml inside the uploaded DOCX file.');\n  const buffer = await this.helpers.getBinaryDataBuffer(i, key);\n  const xml = buffer.toString('utf8');\n  const text = xml\n    .replace(/<w:tab\\/>/g, '\\t')\n    .replace(/<w:br[^>]*\\/>/g, '\\n')\n    .replace(/<\\/w:p>/g, '\\n\\n')\n    .replace(/<[^>]+>/g, '')\n    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&apos;/g, \"'\").replace(/&amp;/g, '&')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n  out.push({ json: { text } });\n}\nreturn out;"
+      },
+      "name": "Read DOCX Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        512
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "name": "Extract TXT Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        1616,
+        672
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const f = $input.first().json;\nconst source = String($('4. Egyptian Legal Dictionary Lookup').first().json.extractedText || '');\nconst translated = String(f.translatedText || '');\n\nconst toLatin = (s) => String(s)\n  .replace(/[\\u0660-\\u0669]/g, d => String(d.charCodeAt(0) - 0x0660))\n  .replace(/[\\u06F0-\\u06F9]/g, d => String(d.charCodeAt(0) - 0x06F0));\nconst nums = (s) => (toLatin(s).replace(/(\\d)[,\\u066C](?=\\d{3})/g, '$1').match(/\\d+/g) || []);\nconst vins = (s) => (toLatin(s).toUpperCase().match(/\\b[A-HJ-NPR-Z0-9]{17}\\b/g) || []);\n\nconst sN = nums(source), tN = nums(translated);\nconst missingNumbers = [...new Set(sN.filter(n => !tN.includes(n)))];\nconst unexpectedNumbers = [...new Set(tN.filter(n => n.length >= 3 && !sN.includes(n)))];\nconst sV = vins(source), tV = vins(translated);\nconst missingVINs = [...new Set(sV.filter(v => !tV.includes(v)))];\n\nconst split = (s) => s.split(/\\n\\s*\\n+/).filter(c => c.trim().length > 0);\nconst sc = split(source), tc = split(translated);\nconst alignedClauses = [];\nfor (let i = 0; i < Math.max(sc.length, tc.length); i++) {\n  alignedClauses.push({\n    clauseIndex: i + 1,\n    sourceClause: sc[i] || '',\n    translatedClause: tc[i] || '',\n    status: (sc[i] && tc[i]) ? 'Aligned' : 'Mismatch Check Required'\n  });\n}\n\nconst isValid = missingNumbers.length === 0 && missingVINs.length === 0;\nconst needsWarning = !isValid || unexpectedNumbers.length > 0;\nlet html = f.html;\nif (needsWarning) {\n  const ar = f.targetLanguage === 'Arabic';\n  const parts = [];\n  if (missingNumbers.length) parts.push((ar ? 'أرقام من الأصل غير موجودة في الترجمة: ' : 'Numbers from the source not found in the translation: ') + missingNumbers.join(', '));\n  if (missingVINs.length) parts.push((ar ? 'أرقام شاسيه/هيكل غير موجودة: ' : 'Chassis/VIN numbers not found: ') + missingVINs.join(', '));\n  if (unexpectedNumbers.length) parts.push((ar ? 'أرقام في الترجمة غير موجودة في الأصل: ' : 'Numbers in the translation not found in the source: ') + unexpectedNumbers.join(', '));\n  const banner = '<div style=\"background:#fef3c7;border:1px solid #f59e0b;padding:10px 14px;margin-bottom:16px;font-family:Arial,sans-serif;font-size:12pt\">' +\n    (ar ? '⚠ راجع هذه الأرقام يدويًا قبل الاعتماد: ' : '⚠ Please verify manually before relying on this translation: ') + parts.join(' | ') + '</div>';\n  html = html.replace('<body>\\n', '<body>\\n' + banner + '\\n');\n}\n\nreturn [{ json: {\n  translatedText: translated,\n  targetLanguage: f.targetLanguage,\n  html,\n  validation: { isValid, missingNumbers, unexpectedNumbers, missingVINs, totalSourceNumbers: sN.length, totalTranslatedNumbers: tN.length },\n  alignedClauses,\n  clauseCountMatches: sc.length === tc.length\n} }];"
+      },
+      "name": "6b. Validate Numbers & Align Clauses",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2576,
+        64
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "value": "done",
+              "type": "string"
+            },
+            {
+              "name": "report",
+              "value": "={{ JSON.stringify({ status: 'success', targetLanguage: $json.targetLanguage, translation: $json.translatedText, formatted_html: $json.html, validation: $json.validation, aligned_clauses: $json.alignedClauses, clause_count_matches: $json.clauseCountMatches }) }}",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Build Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2688,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "name": "report",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "value": "أرسل نص العقد أو ملف PDF أو Word أو TXT.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Unsupported Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2192,
+        1088
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dcuowxwpihkvqxbkpsxp.supabase.co/rest/v1/review_jobs?id=eq.{{ $('1. Webhook (Contract Upload)').first().json.body.job_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $('1. Webhook (Contract Upload)').first().json.headers.authorization || '' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, report: $json.report, error: $json.error }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Save Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2944,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', job_id: $('1. Webhook (Contract Upload)').first().json.body.job_id || null } }}",
+        "options": {}
+      },
+      "name": "Ack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-3.5-flash-lite",
+          "mode": "list",
+          "cachedResultName": "Gemini 3.5 Flash Lite"
+        },
+        "text": "Transcribe every visible character in this legal contract exactly. Preserve Arabic text, clause numbering, paragraph breaks, names, dates, amounts, national IDs, registration numbers and chassis/VIN numbers. Do not summarize, translate, or omit anything. Return only the complete transcription.",
+        "inputType": "binary",
+        "options": {
+          "maxOutputTokens": 32768
+        }
+      },
+      "name": "OCR PDF (Gemini Document)",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        1664,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json || {};\nconst candidates = [j.text, j.output, j.response, j.result, j.content, j.answer, j.mergedResponse];\nlet text = candidates.find(v => typeof v === 'string' && v.trim()) || '';\nif (!text && Array.isArray(j.content)) text = j.content.map(p => p.text || '').join('');\nif (!text && j.content && Array.isArray(j.content.parts)) text = j.content.parts.map(p => p.text || '').join('');\nif (!text && typeof j === 'object') {\n  const nested = Object.values(j).find(v => typeof v === 'object' && v && typeof v.text === 'string');\n  if (nested) text = nested.text;\n}\ntext = String(text || '').trim();\nif (!text) throw new Error('OCR did not return any text. Make sure the PDF contains readable pages and the Gemini credential is connected.');\nreturn { json: { inputType: 'pdf-ocr', fileName: $('1. Webhook (Contract Upload)').first().json.body?.fileName || '', text } };"
+      },
+      "name": "Normalize OCR Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        320
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'error', report: null, error: 'تعذّر إكمال المعالجة بسبب خطأ مؤقت. أعد المحاولة، وإن تكرر الأمر تواصل مع الدعم.' } }];"
+      },
+      "name": "Processing Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        580
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "1. Webhook (Contract Upload)": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Detect Input Type": {
+      "main": [
+        [
+          {
+            "node": "3. Route by Input Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Route by Input Type": {
+      "main": [
+        [
+          {
+            "node": "OCR PDF (Gemini Document)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unzip DOCX",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract TXT Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "4. Egyptian Legal Dictionary Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "4. Egyptian Legal Dictionary Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Egyptian Legal Dictionary Lookup": {
+      "main": [
+        [
+          {
+            "node": "5. AI Legal Translator (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. AI Legal Translator (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "6. Document Formatter (HTML)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Document Formatter (HTML)": {
+      "main": [
+        [
+          {
+            "node": "6b. Validate Numbers & Align Clauses",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip DOCX": {
+      "main": [
+        [
+          {
+            "node": "Read DOCX Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read DOCX Text": {
+      "main": [
+        [
+          {
+            "node": "4. Egyptian Legal Dictionary Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract TXT Text": {
+      "main": [
+        [
+          {
+            "node": "4. Egyptian Legal Dictionary Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6b. Validate Numbers & Align Clauses": {
+      "main": [
+        [
+          {
+            "node": "Build Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsupported Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack": {
+      "main": [
+        [
+          {
+            "node": "2. Detect Input Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OCR PDF (Gemini Document)": {
+      "main": [
+        [
+          {
+            "node": "Normalize OCR Text",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize OCR Text": {
+      "main": [
+        [
+          {
+            "node": "4. Egyptian Legal Dictionary Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Error": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
