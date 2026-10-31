@@ -1,5 +1,7 @@
 # Local Merge Records & Release History (`v1.1.1`) — Muhkam (مُحكَم)
 
+> **حالة عامة لاحقة — 2026-10-31:** أُنشئ [PR #1](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1) كمسودة Draft على فرع `mariam2525-ma-patch-1`، ولم يُدمج. نجح CI للرأس المرحلي `5e7e7ad` في [التشغيل 41202467435](https://github.com/mariam2525-ma/Bayyena-legal-ai/actions/runs/41202467435)؛ الرأس والنتيجة الأحدث مرجعهما [Checks](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1/checks). الأقسام المحلية أدناه سجلات سابقة لا تنفي هذا PR أو CI. 7b يبقى PARTIAL، ونتائج الفريق اليدوية وحدود أدلة المخطط موثقة في QA. لا دمج أو نشر أو تفعيل workflow أو SQL حي.
+
 > **نطاق Supabase في هذه الحزمة:** الكود ومخطط SQL فقط. استُبعد ملف صفوف المعرفة `database/03-bayyena_knowledge_rows.sql` من الملفات الحالية وتاريخ Git؛ أي وصف قديم لـ141 مقطعًا يخص المصدر السابق وليس بيانات موجودة في هذا التسليم. أُحدث اختبار جرد الملفات ليؤكد وجود ملفات SQL الثلاثة وغياب صفوف البيانات، ولم يُحذف أو يُخفف أي اختبار وظيفي أو XSS.
 
 
@@ -43,7 +45,7 @@
   - `npm test` (`node --test tests/smoke.test.js`): 9 tests pass automated tests passed (`PASS`).
 - Tested live site (`https://mohakem-contract-platform.vercel.app/` and `#diag`) in a real headless browser (`TC-01`, `TC-05`, `TC-17`, `TC-18` passed live; `TC-19` and `TC-20` verified in `v1.1.1`).
 
-### 4. What Was Not Tested (ما لم يُختبر ولماذا)
+### 4. What Was Not Tested at the v1.1.1 Release Checkpoint (سجل تاريخي، لا الحالة الحالية)
 - Authenticated end-to-end live executions of `review`, `draft`, `research`, `translate`, `chat`, and `support` (`TC-04`, `TC-06`, `TC-07`, `TC-08`, `TC-10`, `TC-11`, `TC-12`, `TC-14`, `TC-16`) were recorded as `لم يُنفَّذ` because completing live Supabase Sign-Up requires human legal consent confirmation and email inbox verification, and live n8n admin credentials (`googlePalmApi`, `supabaseApi`) are hosted in the team's private cloud accounts.
 - `database/04-retention.sql` was **not** executed against the live Supabase database per explicit user instruction requiring prior owner approval.
 
@@ -57,7 +59,7 @@
 - **Verification:** `npm run check` green (9 tests pass tests passing), `sha256sum assets/policy.pdf` verified (`4c139e22748b1d4da3efd8ac7d1021498a2a74d7eb36760ceb4e4116a570f148`), zero JWTs or personal emails in `git log -p --all`.
 
 
-## Local Audit Preparation — 2026-10-31
+## Historical Pre-push Local Audit Checkpoint — 2026-10-31 (superseded by public PR above)
 - **Branch prepared locally:** `audit/partial-closure-2026-10-31`
 - **Remote push/PR:** not performed; owner approval required.
 - **Evidence:** synthetic negative security results are stored in `evidence/security-negative-tests-2026-10-31.json`; local PR text is in `evidence/LOCAL_PR_DRAFT.txt`.

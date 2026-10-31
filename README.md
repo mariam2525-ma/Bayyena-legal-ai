@@ -1,5 +1,7 @@
 # Muhkam (مُحكَم) — AI-Powered Egyptian Legal Platform (`v1.1.1`)
 
+> **حالة المراجعة العامة — 2026-10-31:** [PR #1](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1) مفتوح كمسودة Draft؛ الرأس الحالي ونتائج CI متاحان في [Checks](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1/checks). نجح CI للرأس المرحلي `5e7e7ad` في [التشغيل 41202467435](https://github.com/mariam2525-ma/Bayyena-legal-ai/actions/runs/41202467435)؛ هذا checkpoint مؤرخ، وليس ادعاءً عن SHA لاحق. نجاح CI لا يثبت الخدمات الحية. 7b ما زال جزئيًا؛ لا يوجد PNG كامل مقبول للجداول العامة من الصادرات المستلمة. لم يُدمج PR ولم يحدث نشر أو تفعيل workflow أو تعديل حي في Supabase.
+
 > **نطاق Supabase في هذه الحزمة:** الكود ومخطط SQL فقط. استُبعد ملف صفوف المعرفة `database/03-bayyena_knowledge_rows.sql` من ملفات المصدر الحالية وتاريخ Git؛ أي وصف قديم لـ141 مقطعًا يخص نسخة سابقة ولا يعني أن صفوف البيانات موجودة في هذا التسليم؛ أي وصف قديم لـ141 مقطعًا يخص المصدر السابق وليس بيانات موجودة في هذا التسليم. أُحدث اختبار جرد الملفات ليؤكد وجود ملفات SQL الثلاثة وغياب صفوف البيانات، ولم يُحذف أو يُخفف أي اختبار وظيفي أو XSS.
 
 
@@ -12,7 +14,7 @@
 
 - **Live Deployed Web App (Vercel):** https://mohakem-contract-platform.vercel.app/
 - **Public Git repository:** https://github.com/mariam2525-ma/Bayyena-legal-ai
-- **Git history:** this bundle includes the supplied `.git` directory unchanged: 25 commits, 10 local branches and 5 tags; commit IDs, subjects and timestamps were not rewritten. By the owner’s explicit request, one personal email remains inside Git history only. The current working tree contains reviewed privacy/lint/documentation fixes, so `git status` may show local changes. No remote is configured and nothing was pushed; the public repository link above is separate.
+- **Git provenance:** the original supplied archive was not rewritten or pushed. The public review branch was built above the repository's existing `main`, using new commits with noreply metadata; no original local history or tags were uploaded. The current delivery omits `.git`. Older archive descriptions refer to the pre-push checkpoint, not this public Draft PR.
 
 ## 1. System Architecture
 ```
@@ -117,4 +119,4 @@ python3 -m http.server 8000
 
 ## حدود أدلة التعاون والنشر
 
-سجل `.git` ووصف الدمجات في `docs/PULL_REQUESTS.md` أدلة محلية مرفقة، لا PRs عامة مثبتة على GitHub. المستودع المحدد هو https://github.com/mariam2525-ma/Bayyena-legal-ai . لم تظهر فيه PRs أو تشغيلات Actions عامة عند فحصه. `deploy.yml` يعرّف GitHub Pages، وليس خط النشر الحالي على Vercel. لم ننفذ push أو CI أو نشرًا خارجيًا. تعديلات هذه الجولة تخص التوثيق، ولا تنشئ تاريخ تعاون جديدًا.
+وصف الدمجات المحلية في `docs/PULL_REQUESTS.md` والمسودة في `evidence/LOCAL_PR_DRAFT.txt` سجلات تاريخية تسبق الدفع، وليست إثباتًا لتعاون عام متعدد الأشخاص. أُنشئ لاحقًا [PR #1 كمسودة](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1) ونُشرت تحديثاته على فرع المراجعة فقط، مع CI فعلي منفصل عن الاختبارات المحلية. مرجع الرأس ونتيجته الحالية [Checks](https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1/checks). يعرّف `deploy.yml` نشر GitHub Pages عند الدفع إلى `main`؛ لذلك قد يشغّل الدمج نشرًا، ولا يُعامل كإجراء توثيق عادي. لم يُنفذ دمج أو نشر أو تفعيل n8n أو SQL حي في هذه المراجعة. هذا PR مراجعة واحد، لا تاريخ تعاون جديد مُفترض.

@@ -1,3 +1,10 @@
+HISTORICAL PRE-PUSH CHECKPOINT — superseded by public Draft PR #1 on 2026-10-31.
+Current PR: https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1
+Current head and CI: https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1/checks
+The original draft below is retained as a historical record, not current status or a new request for approval/tests. Owner and Mona's reported UI separation and file-upload tests are recorded in docs/TESTING_AND_QA.md. No merge, deployment, workflow activation or live SQL is authorized by this historical draft.
+
+BEGIN HISTORICAL DRAFT
+
 LOCAL PR DRAFT — NOT PUSHED
 
 Repository: mariam2525-ma/Bayyena-legal-ai
