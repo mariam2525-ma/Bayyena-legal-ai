@@ -1,0 +1,38 @@
+HISTORICAL PRE-PUSH CHECKPOINT — superseded by public Draft PR #1 on 2026-10-31.
+Current PR: https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1
+Current head and CI: https://github.com/mariam2525-ma/Bayyena-legal-ai/pull/1/checks
+The original draft below is retained as a historical record, not current status or a new request for approval/tests. Owner and Mona's reported UI separation and file-upload tests are recorded in docs/TESTING_AND_QA.md. No merge, deployment, workflow activation or live SQL is authorized by this historical draft.
+
+BEGIN HISTORICAL DRAFT
+
+LOCAL PR DRAFT — NOT PUSHED
+
+Repository: mariam2525-ma/Bayyena-legal-ai
+Base: main at inspected public SHA 00579a0bbf73678d1f3cbbba16fa3fe66b45d1e1
+Local head: audit/partial-closure-2026-10-31
+Remote action: none; no push, no merge, no deployment
+
+Suggested title:
+qa: document authorized negative security checks and CI evidence boundaries
+
+Description:
+This local-only change records the evidence obtained with synthetic inputs only and clarifies the remaining acceptance limits. It does not change privacy policy, terms of use, live Supabase data, n8n credentials, or the original Git history.
+
+Changes:
+- Added evidence/security-negative-tests-2026-10-31.json with exact negative-test outcomes.
+- Preserved the deterministic GitHub Actions CI definition: npm ci from package-lock.json, then npm run check.
+- Preserved the read-only Supabase metadata boundary; no migration was inferred or applied.
+- Kept the four acceptance criteria PARTIAL where cloud proof or owner-authorized credentials are required.
+
+Local verification:
+- npm ci: completed from package-lock.json.
+- npm run check: passed; 9 tests passed, 0 failed.
+- Live synthetic negative checks: review, draft, research, chat, support, translate, and upload returned 401; web-search returned 404 and is not claimed as PASS.
+- Supabase anon checks used limit=0 and a synthetic UUID only; no row values were read.
+
+Remaining owner actions before any public PR/merge:
+1. Review this local branch and the evidence JSON.
+2. Authorize push and PR creation if desired.
+3. Run GitHub Actions on the pushed branch and retain the cloud run URL/SHA.
+4. Provide an approved staging Supabase project and two synthetic authenticated accounts for RLS isolation tests.
+5. Provide an authoritative schema export/migration history before drafting or applying any migration.

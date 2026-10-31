@@ -1,0 +1,784 @@
+{
+  "name": "Workflow 2 - Contract Drafting (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legal-ai/draft",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', job_id: $('Webhook').first().json.body.job_id || null } }}",
+        "options": {}
+      },
+      "name": "Ack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// يحوّل جسم الـ Webhook إلى نفس شكل مخرجات Form Trigger القديمة (حتى لا تتغير باقي العقد)\nconst w = $('Webhook').first();\nconst u = $('Verify User').first().json;\nreturn [{ json: { ...(w.json.body || {}), user_id: u.id, user_email: u.email }, binary: w.binary }];"
+      },
+      "name": "Form Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        160
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.contract_type || \"\").trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{ String($json.first_party_info || \"\").trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{ String($json.second_party_info || \"\").trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{ $json.contract_type === \"عقد بيع سيارة\" ? String($json.car_chassis_motor || \"\").trim() : String($json.property_address || \"\").trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Validate Required Fields",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1104,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VYNs6LltvFbHsbr7",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VYNs6LltvFbHsbr7",
+          "cachedResultName": "Workflow 4 - Legal Research (Webhook)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contract_type": "={{ $('Form Input').item.json.contract_type }}",
+            "jurisdiction": "Egypt",
+            "user_role": "={{ $('Form Input').item.json.user_role || '' }}",
+            "question": "={{ 'ما الأساس القانوني المصري والقواعد والبنود الإلزامية الواجب مراعاتها عند صياغة ' + $('Form Input').item.json.contract_type + '؟' }}",
+            "parties": "={{ { first_party: $('Form Input').item.json.first_party_info || '', second_party: $('Form Input').item.json.second_party_info || '' } }}",
+            "facts": "={{ (() => { const j = $('Form Input').item.json; const keys = j.contract_type === 'عقد بيع سيارة' ? ['car_make_model','car_plates_license','car_chassis_motor','car_price_payment','car_handover_datetime'] : ['property_address','property_rent_payment','property_deposit','property_start_date','property_end_duration']; const o = {}; keys.forEach(k => { o[k] = j[k] || '[غير مذكور]'; }); return o; })() }}",
+            "requested_clauses": "={{ { penalty_clause: $('Form Input').item.json.penalty_clause || '[غير مذكور]', governing_law: $('Form Input').item.json.governing_law || 'أحكام القانون المصري', competent_court: $('Form Input').item.json.competent_court || '[غير مذكور]', additional: $('Form Input').item.json.requested_clauses || $('Form Input').item.json.additional_clauses || '' } }}",
+            "contract_requirements": "={{ String($('Form Input').item.json.contract_requirements || $('Form Input').item.json.requirements || $('Form Input').item.json.notes || '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "contract_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "displayName": "jurisdiction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "displayName": "user_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "displayName": "parties",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "facts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "requested_clauses",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "displayName": "contract_requirements",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "displayName": "job_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "name": "Legal Research (Workflow 4)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1376,
+        608
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3.5-flash-lite",
+          "cachedResultName": "models/gemini-3.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=أعد الهيكل النموذجي المعتمد في مصر لعقد \"{{ $('Form Input').item.json.contract_type }}\".\n\n## بيانات العقد\n- نوع العقد: {{ $('Form Input').item.json.contract_type }}\n- الطرف الأول ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'البائع' : 'المؤجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.first_party_info }}\n- الطرف الثاني ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'المشتري' : 'المستأجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.second_party_info }}\n{{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? ('## بيانات السيارة\\n- الماركة والموديل وسنة الصنع واللون: ' + ($('Form Input').item.json.car_make_model || '[غير مذكور]') + '\\n- رقم اللوحات ورقم الرخصة وجهة الترخيص: ' + ($('Form Input').item.json.car_plates_license || '[غير مذكور]') + '\\n- رقم الشاسيه ورقم الموتور: ' + ($('Form Input').item.json.car_chassis_motor || '[غير مذكور]') + '\\n- الثمن الإجمالي المتفق عليه وطريقة السداد: ' + ($('Form Input').item.json.car_price_payment || '[غير مذكور]') + '\\n- تاريخ وساعة تسليم السيارة ونقل الحيازة: ' + ($('Form Input').item.json.car_handover_datetime || '[غير مذكور]')) : ('## بيانات العقار\\n- العنوان التفصيلي ورقم الشقة والدور: ' + ($('Form Input').item.json.property_address || '[غير مذكور]') + '\\n- القيمة الإيجارية الشهرية وموعد السداد: ' + ($('Form Input').item.json.property_rent_payment || '[غير مذكور]') + '\\n- مبلغ التأمين النقدي: ' + ($('Form Input').item.json.property_deposit || '[غير مذكور]') + '\\n- تاريخ بدء الإيجار: ' + ($('Form Input').item.json.property_start_date || '[غير مذكور]') + '\\n- تاريخ انتهاء الإيجار ومدة العقد: ' + ($('Form Input').item.json.property_end_duration || '[غير مذكور]')) }}\n## البنود القانونية وفض النزاع\n- الشرط الجزائي: {{ $('Form Input').item.json.penalty_clause || '[غير مذكور]' }}\n- القانون الواجب التطبيق: {{ $('Form Input').item.json.governing_law || 'أحكام القانون المصري' }}\n- المحكمة المختصة: {{ $('Form Input').item.json.competent_court || '[المحكمة المختصة]' }}\n\nقدم هيكل العقد بندًا بندًا (العنوان، التمهيد، بيانات الطرفين، محل العقد، البنود التشغيلية، البنود الإلزامية الواردة في التعليمات، الاختصاص، التوقيعات) مع سطر واحد يوضح ما يجب أن يغطيه كل بند، واستخدم عناصر نائبة مثل [الطرف الأول]."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "أنت متخصص في نماذج العقود المصرية. أعد هيكل النموذج فقط دون مقدمة.\n\nالقانون الحاكم إلزاميًا هو القانون المصري وحده. لا تستخدم أي قانون أجنبي أو مبادئ عامة غير مصرية. اكتب باللغة العربية الفصحى القانونية المستخدمة في مصر. طبّق الإطار التشريعي الخاص بنوع العقد المحدد فقط، ولا تخلط بين أحكام النوعين.\n\nإذا كان العقد \"عقد بيع سيارة\":\n- الإطار التشريعي: القانون المدني المصري (أحكام عقد البيع والتسليم وضمان العيوب الخفية) وقانون المرور المصري رقم 66 لسنة 1973 وتعديلاته ولائحته التنفيذية.\n- البنود الإلزامية:\n  1) نقل الملكية: التزام الطرفين بالتوقيع على عقد البيع أمام مكتب الشهر العقاري والتوثيق المختص، ونقل الترخيص بوحدة المرور المختصة خلال مدة محددة، وبيان من يتحمل المصروفات.\n  2) التسليم الفعلي ونقل الحيازة بالتاريخ والساعة المحددين بدقة كما أدخلهما المستخدم، مع إقرار المشتري بالمعاينة التامة النافية للجهالة.\n  3) العيوب القانونية والضمان: ضمان البائع خلو السيارة من أي حقوق للغير أو رهن أو حجز أو نزاع، وأحكام ضمان العيوب الخفية وفق القانون المدني.\n  4) المخالفات والمسؤوليات المرورية: البائع مسؤول عن كافة المخالفات والغرامات والضرائب والرسوم والمسؤوليات المدنية والجنائية السابقة على تاريخ وساعة التسليم، والمشتري مسؤول عما يلحق بعدها.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا كان العقد \"عقد إيجار سكني\":\n- الإطار التشريعي: القانون رقم 4 لسنة 1996 بشأن سريان أحكام القانون المدني على الأماكن التي لم يسبق تأجيرها والأماكن التي انتهت أو تنتهي عقود إيجارها، وأحكام الإيجار في القانون المدني المصري.\n- البنود الإلزامية:\n  1) التأمين النقدي: مبلغه كما أدخله المستخدم، وشروط رده عند انتهاء العقد وتسليم العين بعد خصم أي تلفيات أو مستحقات.\n  2) الإخلاء عند انتهاء المدة: التزام المستأجر بإخلاء العين وتسليمها خالية فور انتهاء المدة دون حاجة إلى تنبيه أو إنذار، ودون تجديد ضمني إلا بعقد مكتوب جديد.\n  3) فواتير المرافق: تحمل المستأجر فواتير الكهرباء والمياه والغاز والإنترنت ومصروفات الاستهلاك طوال مدة الانتفاع.\n  4) غرامات التأخير والشرط الفاسخ الصريح: غرامة عن التأخر في سداد الأجرة أو في الإخلاء، واعتبار العقد مفسوخًا من تلقاء نفسه دون حاجة لتنبيه أو إنذار أو حكم قضائي عند التأخر في سداد الأجرة أو الإخلال بأي التزام.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا لم يحدد المستخدم القانون الواجب التطبيق فاعتمد \"أحكام القانون المصري\". إذا لم يحدد المحكمة المختصة فاستخدم العنصر النائب [المحكمة المختصة].\nعند ذكر أرقام المواد: لا تخترع أي رقم مادة. إذا لم تكن متأكدًا من رقم المادة فاكتب \"[يتطلب التحقق]\".",
+          "maxOutputTokens": 4096,
+          "temperature": 0.2
+        }
+      },
+      "name": "Retrieve Templates",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1600,
+        384
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3.5-flash-lite",
+          "cachedResultName": "models/gemini-3.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=حدد النصوص القانونية المصرية الواجبة التطبيق على عقد \"{{ $('Form Input').item.json.contract_type }}\".\n\n## بيانات العقد\n- نوع العقد: {{ $('Form Input').item.json.contract_type }}\n- الطرف الأول ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'البائع' : 'المؤجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.first_party_info }}\n- الطرف الثاني ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'المشتري' : 'المستأجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.second_party_info }}\n{{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? ('## بيانات السيارة\\n- الماركة والموديل وسنة الصنع واللون: ' + ($('Form Input').item.json.car_make_model || '[غير مذكور]') + '\\n- رقم اللوحات ورقم الرخصة وجهة الترخيص: ' + ($('Form Input').item.json.car_plates_license || '[غير مذكور]') + '\\n- رقم الشاسيه ورقم الموتور: ' + ($('Form Input').item.json.car_chassis_motor || '[غير مذكور]') + '\\n- الثمن الإجمالي المتفق عليه وطريقة السداد: ' + ($('Form Input').item.json.car_price_payment || '[غير مذكور]') + '\\n- تاريخ وساعة تسليم السيارة ونقل الحيازة: ' + ($('Form Input').item.json.car_handover_datetime || '[غير مذكور]')) : ('## بيانات العقار\\n- العنوان التفصيلي ورقم الشقة والدور: ' + ($('Form Input').item.json.property_address || '[غير مذكور]') + '\\n- القيمة الإيجارية الشهرية وموعد السداد: ' + ($('Form Input').item.json.property_rent_payment || '[غير مذكور]') + '\\n- مبلغ التأمين النقدي: ' + ($('Form Input').item.json.property_deposit || '[غير مذكور]') + '\\n- تاريخ بدء الإيجار: ' + ($('Form Input').item.json.property_start_date || '[غير مذكور]') + '\\n- تاريخ انتهاء الإيجار ومدة العقد: ' + ($('Form Input').item.json.property_end_duration || '[غير مذكور]')) }}\n## البنود القانونية وفض النزاع\n- الشرط الجزائي: {{ $('Form Input').item.json.penalty_clause || '[غير مذكور]' }}\n- القانون الواجب التطبيق: {{ $('Form Input').item.json.governing_law || 'أحكام القانون المصري' }}\n- المحكمة المختصة: {{ $('Form Input').item.json.competent_court || '[المحكمة المختصة]' }}\n\nلكل نص اذكر: اسم القانون، رقم المادة (أو [يتطلب التحقق])، ملخص الحكم، وأثره على صياغة هذا العقد (بنود إلزامية، شكليات، شروط محظورة)."
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "أنت باحث قانوني متخصص في القانون المصري. استخرج النصوص بدقة وإيجاز.\n\nالقانون الحاكم إلزاميًا هو القانون المصري وحده. لا تستخدم أي قانون أجنبي أو مبادئ عامة غير مصرية. اكتب باللغة العربية الفصحى القانونية المستخدمة في مصر. طبّق الإطار التشريعي الخاص بنوع العقد المحدد فقط، ولا تخلط بين أحكام النوعين.\n\nإذا كان العقد \"عقد بيع سيارة\":\n- الإطار التشريعي: القانون المدني المصري (أحكام عقد البيع والتسليم وضمان العيوب الخفية) وقانون المرور المصري رقم 66 لسنة 1973 وتعديلاته ولائحته التنفيذية.\n- البنود الإلزامية:\n  1) نقل الملكية: التزام الطرفين بالتوقيع على عقد البيع أمام مكتب الشهر العقاري والتوثيق المختص، ونقل الترخيص بوحدة المرور المختصة خلال مدة محددة، وبيان من يتحمل المصروفات.\n  2) التسليم الفعلي ونقل الحيازة بالتاريخ والساعة المحددين بدقة كما أدخلهما المستخدم، مع إقرار المشتري بالمعاينة التامة النافية للجهالة.\n  3) العيوب القانونية والضمان: ضمان البائع خلو السيارة من أي حقوق للغير أو رهن أو حجز أو نزاع، وأحكام ضمان العيوب الخفية وفق القانون المدني.\n  4) المخالفات والمسؤوليات المرورية: البائع مسؤول عن كافة المخالفات والغرامات والضرائب والرسوم والمسؤوليات المدنية والجنائية السابقة على تاريخ وساعة التسليم، والمشتري مسؤول عما يلحق بعدها.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا كان العقد \"عقد إيجار سكني\":\n- الإطار التشريعي: القانون رقم 4 لسنة 1996 بشأن سريان أحكام القانون المدني على الأماكن التي لم يسبق تأجيرها والأماكن التي انتهت أو تنتهي عقود إيجارها، وأحكام الإيجار في القانون المدني المصري.\n- البنود الإلزامية:\n  1) التأمين النقدي: مبلغه كما أدخله المستخدم، وشروط رده عند انتهاء العقد وتسليم العين بعد خصم أي تلفيات أو مستحقات.\n  2) الإخلاء عند انتهاء المدة: التزام المستأجر بإخلاء العين وتسليمها خالية فور انتهاء المدة دون حاجة إلى تنبيه أو إنذار، ودون تجديد ضمني إلا بعقد مكتوب جديد.\n  3) فواتير المرافق: تحمل المستأجر فواتير الكهرباء والمياه والغاز والإنترنت ومصروفات الاستهلاك طوال مدة الانتفاع.\n  4) غرامات التأخير والشرط الفاسخ الصريح: غرامة عن التأخر في سداد الأجرة أو في الإخلاء، واعتبار العقد مفسوخًا من تلقاء نفسه دون حاجة لتنبيه أو إنذار أو حكم قضائي عند التأخر في سداد الأجرة أو الإخلال بأي التزام.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا لم يحدد المستخدم القانون الواجب التطبيق فاعتمد \"أحكام القانون المصري\". إذا لم يحدد المحكمة المختصة فاستخدم العنصر النائب [المحكمة المختصة].\nعند ذكر أرقام المواد: لا تخترع أي رقم مادة. إذا لم تكن متأكدًا من رقم المادة فاكتب \"[يتطلب التحقق]\".",
+          "maxOutputTokens": 4096,
+          "temperature": 0.2
+        }
+      },
+      "name": "Retrieve Laws",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        1824,
+        384
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3.5-flash-lite",
+          "cachedResultName": "models/gemini-3.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=صغ العقد الكامل بناءً على ما يلي.\n\n## بيانات العقد\n- نوع العقد: {{ $('Form Input').item.json.contract_type }}\n- الطرف الأول ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'البائع' : 'المؤجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.first_party_info }}\n- الطرف الثاني ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'المشتري' : 'المستأجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.second_party_info }}\n{{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? ('## بيانات السيارة\\n- الماركة والموديل وسنة الصنع واللون: ' + ($('Form Input').item.json.car_make_model || '[غير مذكور]') + '\\n- رقم اللوحات ورقم الرخصة وجهة الترخيص: ' + ($('Form Input').item.json.car_plates_license || '[غير مذكور]') + '\\n- رقم الشاسيه ورقم الموتور: ' + ($('Form Input').item.json.car_chassis_motor || '[غير مذكور]') + '\\n- الثمن الإجمالي المتفق عليه وطريقة السداد: ' + ($('Form Input').item.json.car_price_payment || '[غير مذكور]') + '\\n- تاريخ وساعة تسليم السيارة ونقل الحيازة: ' + ($('Form Input').item.json.car_handover_datetime || '[غير مذكور]')) : ('## بيانات العقار\\n- العنوان التفصيلي ورقم الشقة والدور: ' + ($('Form Input').item.json.property_address || '[غير مذكور]') + '\\n- القيمة الإيجارية الشهرية وموعد السداد: ' + ($('Form Input').item.json.property_rent_payment || '[غير مذكور]') + '\\n- مبلغ التأمين النقدي: ' + ($('Form Input').item.json.property_deposit || '[غير مذكور]') + '\\n- تاريخ بدء الإيجار: ' + ($('Form Input').item.json.property_start_date || '[غير مذكور]') + '\\n- تاريخ انتهاء الإيجار ومدة العقد: ' + ($('Form Input').item.json.property_end_duration || '[غير مذكور]')) }}\n## البنود القانونية وفض النزاع\n- الشرط الجزائي: {{ $('Form Input').item.json.penalty_clause || '[غير مذكور]' }}\n- القانون الواجب التطبيق: {{ $('Form Input').item.json.governing_law || 'أحكام القانون المصري' }}\n- المحكمة المختصة: {{ $('Form Input').item.json.competent_court || '[المحكمة المختصة]' }}\n\n## هيكل النموذج\n{{ ($('Retrieve Templates').item.json.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('') }}\n\n## النصوص القانونية المصرية الواجبة التطبيق\n{{ ($('Retrieve Laws').item.json.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('') }}\n\n## نتيجة البحث القانوني المنظمة (من سير عمل البحث القانوني)\n- حالة استرجاع مصادر الويب: {{ $('Legal Research (Workflow 4)').first().json.web_retrieval_status || 'failed' }}\n- الأساس القانوني: {{ $('Legal Research (Workflow 4)').first().json.legal_basis || '[لم يتوفر بحث]' }}\n- القواعد المنطبقة: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.applicable_rules || []) }}\n- المصادر: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.sources || []) }}\n- الاستشهادات: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.citations || []) }}\n- روابط المصادر المسترجعة فعلياً (الروابط الوحيدة المسموح بذكرها): {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.source_urls || []) }}\n- درجة عدم اليقين: {{ $('Legal Research (Workflow 4)').first().json.uncertainty || '[غير معروفة]' }}\n- القيود: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.limitations || ['لم يتوفر بحث قانوني منظم']) }}\n- الوقائع الناقصة: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.missing_facts || []) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "أنت محامٍ مصري خبير في صياغة العقود. صغ عقدًا كاملًا ملزمًا بصياغة قانونية مصرية، ببنود مرقمة، يتضمن كل البيانات المدخلة وكل البنود الإلزامية، مع خانات التوقيع والشهود. لا تخترع بيانات غير مقدمة واستخدم عناصر نائبة مثل [التاريخ]. اعتمد على نتيجة البحث القانوني المنظمة: استشهد في البنود ذات الصلة بالمادة أو المصدر بين معقوفين (مثال: [القانون المدني - المادة ...] أو [مصدر 1]). لا تذكر أي رابط غير وارد في \"روابط المصادر المسترجعة فعلياً\". بعد التوقيعات أضف قسمًا بعنوان \"المراجع والمصادر\" يسرد المصادر والروابط المسترجعة مع حالة التحقق، وقسمًا بعنوان \"ملاحظات تتطلب مراجعة قانونية بشرية\" يسرد الوقائع الناقصة والقيود ونقاط عدم اليقين وأي مادة موسومة [يتطلب التحقق]. أخرج نص العقد مع هذين القسمين فقط.\n\nالقانون الحاكم إلزاميًا هو القانون المصري وحده. لا تستخدم أي قانون أجنبي أو مبادئ عامة غير مصرية. اكتب باللغة العربية الفصحى القانونية المستخدمة في مصر. طبّق الإطار التشريعي الخاص بنوع العقد المحدد فقط، ولا تخلط بين أحكام النوعين.\n\nإذا كان العقد \"عقد بيع سيارة\":\n- الإطار التشريعي: القانون المدني المصري (أحكام عقد البيع والتسليم وضمان العيوب الخفية) وقانون المرور المصري رقم 66 لسنة 1973 وتعديلاته ولائحته التنفيذية.\n- البنود الإلزامية:\n  1) نقل الملكية: التزام الطرفين بالتوقيع على عقد البيع أمام مكتب الشهر العقاري والتوثيق المختص، ونقل الترخيص بوحدة المرور المختصة خلال مدة محددة، وبيان من يتحمل المصروفات.\n  2) التسليم الفعلي ونقل الحيازة بالتاريخ والساعة المحددين بدقة كما أدخلهما المستخدم، مع إقرار المشتري بالمعاينة التامة النافية للجهالة.\n  3) العيوب القانونية والضمان: ضمان البائع خلو السيارة من أي حقوق للغير أو رهن أو حجز أو نزاع، وأحكام ضمان العيوب الخفية وفق القانون المدني.\n  4) المخالفات والمسؤوليات المرورية: البائع مسؤول عن كافة المخالفات والغرامات والضرائب والرسوم والمسؤوليات المدنية والجنائية السابقة على تاريخ وساعة التسليم، والمشتري مسؤول عما يلحق بعدها.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا كان العقد \"عقد إيجار سكني\":\n- الإطار التشريعي: القانون رقم 4 لسنة 1996 بشأن سريان أحكام القانون المدني على الأماكن التي لم يسبق تأجيرها والأماكن التي انتهت أو تنتهي عقود إيجارها، وأحكام الإيجار في القانون المدني المصري.\n- البنود الإلزامية:\n  1) التأمين النقدي: مبلغه كما أدخله المستخدم، وشروط رده عند انتهاء العقد وتسليم العين بعد خصم أي تلفيات أو مستحقات.\n  2) الإخلاء عند انتهاء المدة: التزام المستأجر بإخلاء العين وتسليمها خالية فور انتهاء المدة دون حاجة إلى تنبيه أو إنذار، ودون تجديد ضمني إلا بعقد مكتوب جديد.\n  3) فواتير المرافق: تحمل المستأجر فواتير الكهرباء والمياه والغاز والإنترنت ومصروفات الاستهلاك طوال مدة الانتفاع.\n  4) غرامات التأخير والشرط الفاسخ الصريح: غرامة عن التأخر في سداد الأجرة أو في الإخلاء، واعتبار العقد مفسوخًا من تلقاء نفسه دون حاجة لتنبيه أو إنذار أو حكم قضائي عند التأخر في سداد الأجرة أو الإخلال بأي التزام.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا لم يحدد المستخدم القانون الواجب التطبيق فاعتمد \"أحكام القانون المصري\". إذا لم يحدد المحكمة المختصة فاستخدم العنصر النائب [المحكمة المختصة].\nعند ذكر أرقام المواد: لا تخترع أي رقم مادة. إذا لم تكن متأكدًا من رقم المادة فاكتب \"[يتطلب التحقق]\".",
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Draft Contract",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2128,
+        384
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3.5-flash-lite",
+          "cachedResultName": "models/gemini-3.5-flash-lite"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=راجع العقد التالي واعتمده في صيغته النهائية.\n\n## بيانات العقد\n- نوع العقد: {{ $('Form Input').item.json.contract_type }}\n- الطرف الأول ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'البائع' : 'المؤجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.first_party_info }}\n- الطرف الثاني ({{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? 'المشتري' : 'المستأجر' }}) - الاسم بالكامل والرقم القومي ومحل الإقامة: {{ $('Form Input').item.json.second_party_info }}\n{{ $('Form Input').item.json.contract_type === 'عقد بيع سيارة' ? ('## بيانات السيارة\\n- الماركة والموديل وسنة الصنع واللون: ' + ($('Form Input').item.json.car_make_model || '[غير مذكور]') + '\\n- رقم اللوحات ورقم الرخصة وجهة الترخيص: ' + ($('Form Input').item.json.car_plates_license || '[غير مذكور]') + '\\n- رقم الشاسيه ورقم الموتور: ' + ($('Form Input').item.json.car_chassis_motor || '[غير مذكور]') + '\\n- الثمن الإجمالي المتفق عليه وطريقة السداد: ' + ($('Form Input').item.json.car_price_payment || '[غير مذكور]') + '\\n- تاريخ وساعة تسليم السيارة ونقل الحيازة: ' + ($('Form Input').item.json.car_handover_datetime || '[غير مذكور]')) : ('## بيانات العقار\\n- العنوان التفصيلي ورقم الشقة والدور: ' + ($('Form Input').item.json.property_address || '[غير مذكور]') + '\\n- القيمة الإيجارية الشهرية وموعد السداد: ' + ($('Form Input').item.json.property_rent_payment || '[غير مذكور]') + '\\n- مبلغ التأمين النقدي: ' + ($('Form Input').item.json.property_deposit || '[غير مذكور]') + '\\n- تاريخ بدء الإيجار: ' + ($('Form Input').item.json.property_start_date || '[غير مذكور]') + '\\n- تاريخ انتهاء الإيجار ومدة العقد: ' + ($('Form Input').item.json.property_end_duration || '[غير مذكور]')) }}\n## البنود القانونية وفض النزاع\n- الشرط الجزائي: {{ $('Form Input').item.json.penalty_clause || '[غير مذكور]' }}\n- القانون الواجب التطبيق: {{ $('Form Input').item.json.governing_law || 'أحكام القانون المصري' }}\n- المحكمة المختصة: {{ $('Form Input').item.json.competent_court || '[المحكمة المختصة]' }}\n\n## النصوص القانونية المصرية\n{{ ($('Retrieve Laws').item.json.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('') }}\n\n## مسودة العقد\n{{ ($('Draft Contract').item.json.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('') }}\n\n## نتيجة البحث القانوني المنظمة (من سير عمل البحث القانوني)\n- حالة استرجاع مصادر الويب: {{ $('Legal Research (Workflow 4)').first().json.web_retrieval_status || 'failed' }}\n- الأساس القانوني: {{ $('Legal Research (Workflow 4)').first().json.legal_basis || '[لم يتوفر بحث]' }}\n- القواعد المنطبقة: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.applicable_rules || []) }}\n- المصادر: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.sources || []) }}\n- الاستشهادات: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.citations || []) }}\n- روابط المصادر المسترجعة فعلياً (الروابط الوحيدة المسموح بذكرها): {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.source_urls || []) }}\n- درجة عدم اليقين: {{ $('Legal Research (Workflow 4)').first().json.uncertainty || '[غير معروفة]' }}\n- القيود: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.limitations || ['لم يتوفر بحث قانوني منظم']) }}\n- الوقائع الناقصة: {{ JSON.stringify($('Legal Research (Workflow 4)').first().json.missing_facts || []) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "systemMessage": "أنت مراجع قانوني أول متخصص في القانون المصري. تحقق من مطابقة المسودة للبيانات المدخلة وللقانون المصري، وتأكد من وجود كل البنود الإلزامية لنوع العقد، وصحح أي نقص أو تعارض أو غموض مباشرة في النص. تحقق من أن كل استشهاد يطابق نتيجة البحث القانوني المنظمة، واحذف أي رابط غير وارد في \"روابط المصادر المسترجعة فعلياً\" وأي رقم مادة غير مؤكد (استبدله بـ [يتطلب التحقق]). تأكد من وجود قسم \"المراجع والمصادر\" وقسم \"ملاحظات تتطلب مراجعة قانونية بشرية\" في النهاية، وأن الأخير يسرد كل الوقائع الناقصة والقيود ونقاط عدم اليقين؛ وإذا فشل استرجاع المصادر فاذكر صراحة أن المصادر غير متحقق منها. أخرج نص العقد النهائي مع هذين القسمين فقط دون أي تعليقات أخرى.\n\nالقانون الحاكم إلزاميًا هو القانون المصري وحده. لا تستخدم أي قانون أجنبي أو مبادئ عامة غير مصرية. اكتب باللغة العربية الفصحى القانونية المستخدمة في مصر. طبّق الإطار التشريعي الخاص بنوع العقد المحدد فقط، ولا تخلط بين أحكام النوعين.\n\nإذا كان العقد \"عقد بيع سيارة\":\n- الإطار التشريعي: القانون المدني المصري (أحكام عقد البيع والتسليم وضمان العيوب الخفية) وقانون المرور المصري رقم 66 لسنة 1973 وتعديلاته ولائحته التنفيذية.\n- البنود الإلزامية:\n  1) نقل الملكية: التزام الطرفين بالتوقيع على عقد البيع أمام مكتب الشهر العقاري والتوثيق المختص، ونقل الترخيص بوحدة المرور المختصة خلال مدة محددة، وبيان من يتحمل المصروفات.\n  2) التسليم الفعلي ونقل الحيازة بالتاريخ والساعة المحددين بدقة كما أدخلهما المستخدم، مع إقرار المشتري بالمعاينة التامة النافية للجهالة.\n  3) العيوب القانونية والضمان: ضمان البائع خلو السيارة من أي حقوق للغير أو رهن أو حجز أو نزاع، وأحكام ضمان العيوب الخفية وفق القانون المدني.\n  4) المخالفات والمسؤوليات المرورية: البائع مسؤول عن كافة المخالفات والغرامات والضرائب والرسوم والمسؤوليات المدنية والجنائية السابقة على تاريخ وساعة التسليم، والمشتري مسؤول عما يلحق بعدها.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا كان العقد \"عقد إيجار سكني\":\n- الإطار التشريعي: القانون رقم 4 لسنة 1996 بشأن سريان أحكام القانون المدني على الأماكن التي لم يسبق تأجيرها والأماكن التي انتهت أو تنتهي عقود إيجارها، وأحكام الإيجار في القانون المدني المصري.\n- البنود الإلزامية:\n  1) التأمين النقدي: مبلغه كما أدخله المستخدم، وشروط رده عند انتهاء العقد وتسليم العين بعد خصم أي تلفيات أو مستحقات.\n  2) الإخلاء عند انتهاء المدة: التزام المستأجر بإخلاء العين وتسليمها خالية فور انتهاء المدة دون حاجة إلى تنبيه أو إنذار، ودون تجديد ضمني إلا بعقد مكتوب جديد.\n  3) فواتير المرافق: تحمل المستأجر فواتير الكهرباء والمياه والغاز والإنترنت ومصروفات الاستهلاك طوال مدة الانتفاع.\n  4) غرامات التأخير والشرط الفاسخ الصريح: غرامة عن التأخر في سداد الأجرة أو في الإخلاء، واعتبار العقد مفسوخًا من تلقاء نفسه دون حاجة لتنبيه أو إنذار أو حكم قضائي عند التأخر في سداد الأجرة أو الإخلال بأي التزام.\n  5) الشرط الجزائي المتفق عليه كما أدخله المستخدم.\n  6) القانون الواجب التطبيق والمحكمة المختصة كما أدخلهما المستخدم حرفيًا.\n\nإذا لم يحدد المستخدم القانون الواجب التطبيق فاعتمد \"أحكام القانون المصري\". إذا لم يحدد المحكمة المختصة فاستخدم العنصر النائب [المحكمة المختصة].\nعند ذكر أرقام المواد: لا تخترع أي رقم مادة. إذا لم تكن متأكدًا من رقم المادة فاكتب \"[يتطلب التحقق]\".",
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Self-Review",
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        2480,
+        384
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "value": "done",
+              "type": "string"
+            },
+            {
+              "name": "report",
+              "value": "={{ ($('Self-Review').item.json.content?.parts || []).filter(p => p.text && !p.thought).map(p => p.text).join('') }}",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Build Draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2832,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dcuowxwpihkvqxbkpsxp.supabase.co/rest/v1/review_jobs?id=eq.{{ $('Webhook').first().json.body.job_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Webhook').first().json.headers.authorization || '' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, report: $json.report, error: $json.error }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Save Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3088,
+        384
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "value": "error",
+              "type": "string"
+            },
+            {
+              "name": "report",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "value": "={{ 'الحقول التالية ناقصة: ' + ([\"contract_type\",\"first_party_info\",\"second_party_info\", ($json.contract_type === \"عقد بيع سيارة\" ? \"car_chassis_motor\" : \"property_address\")].filter(f => !String($json[f] || \"\").trim()).join(\", \") }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Missing Fields Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1424,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        624,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'error', report: null, error: 'تعذّر إكمال المعالجة بسبب خطأ مؤقت. أعد المحاولة، وإن تكرر الأمر تواصل مع الدعم.' } }];"
+      },
+      "name": "Processing Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2864,
+        644
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack": {
+      "main": [
+        [
+          {
+            "node": "Form Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Input": {
+      "main": [
+        [
+          {
+            "node": "Validate Required Fields",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Required Fields": {
+      "main": [
+        [
+          {
+            "node": "Legal Research (Workflow 4)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Missing Fields Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Legal Research (Workflow 4)": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Templates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Templates": {
+      "main": [
+        [
+          {
+            "node": "Retrieve Laws",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrieve Laws": {
+      "main": [
+        [
+          {
+            "node": "Draft Contract",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Draft Contract": {
+      "main": [
+        [
+          {
+            "node": "Self-Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Self-Review": {
+      "main": [
+        [
+          {
+            "node": "Build Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Draft": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Missing Fields Result": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Error": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [
+    {
+      "name": "Research legal basis",
+      "nodeIds": [
+        "47af4bfc-66e0-4692-9fcc-a5cd310ab068",
+        "d70be65c-f3a1-463b-95d9-f3f229778f7a",
+        "8e0b3cb9-0903-442f-a96e-25c351d12e7b"
+      ],
+      "description": "Builds the Egyptian template outline for a car sale or residential lease and gathers the Egyptian laws that apply"
+    }
+  ],
+  "tags": []
+}

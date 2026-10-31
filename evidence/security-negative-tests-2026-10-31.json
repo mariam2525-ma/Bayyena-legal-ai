@@ -1,0 +1,127 @@
+{
+  "project": "Muhkam (مُحكَم)",
+  "executed_at": "2026-10-31T11:38:07+02:00",
+  "environment": "authorized My Browser session; synthetic demo account and synthetic contract text only; no real file, no row values",
+  "scope": "negative security and access-control checks; not a full security audit",
+  "cases": [
+    {
+      "id": "N8N-01",
+      "target": "review",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-02",
+      "target": "draft",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-03",
+      "target": "research",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-04",
+      "target": "chat",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-05",
+      "target": "support",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-06",
+      "target": "translate-contract-hybrid",
+      "method": "POST",
+      "input": "synthetic Arabic text + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-07",
+      "target": "review upload",
+      "method": "POST multipart",
+      "input": "synthetic text file only + Authorization: Bearer diag",
+      "result": "401 Unauthorized",
+      "evidence": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "id": "N8N-08",
+      "target": "web-search",
+      "method": "POST",
+      "input": "synthetic JSON + Authorization: Bearer diag",
+      "result": "404 Not Found",
+      "evidence": "requested webhook POST legal-ai/web is not registered"
+    },
+    {
+      "id": "SB-01",
+      "target": "public.history",
+      "method": "GET limit=0",
+      "input": "synthetic UUID 00000000-0000-0000-0000-000000000001; publishable key",
+      "result": "401 permission denied",
+      "evidence": "current role lacks SELECT on public.history"
+    },
+    {
+      "id": "SB-02",
+      "target": "public.review_jobs",
+      "method": "GET limit=0",
+      "input": "synthetic UUID 00000000-0000-0000-0000-000000000001; publishable key",
+      "result": "200 []",
+      "evidence": "no row values returned"
+    },
+    {
+      "id": "SB-03",
+      "target": "public.support_tickets",
+      "method": "GET limit=0",
+      "input": "synthetic UUID 00000000-0000-0000-0000-000000000001; publishable key",
+      "result": "200 []",
+      "evidence": "no row values returned"
+    },
+    {
+      "id": "SB-04",
+      "target": "public.bayyena_knowledge",
+      "method": "GET limit=0",
+      "input": "publishable key; no row selection",
+      "result": "401 permission denied",
+      "evidence": "current role lacks SELECT on public.bayyena_knowledge"
+    },
+    {
+      "id": "AUTH-01",
+      "target": "live signup/login",
+      "method": "browser UI",
+      "input": "synthetic account name; reserved example.com address; synthetic password entered only in browser",
+      "result": "account created; authenticated UI session shown as Muhkam QA Demo 2026; history initially empty",
+      "evidence": "live browser session showed account name and خروج button; no personal inbox or real identity used"
+    },
+    {
+      "id": "LIVE-REVIEW-01",
+      "target": "contract review text path",
+      "method": "browser UI",
+      "input": "synthetic Arabic residential lease text; default tenant/lease context; external search not relied upon",
+      "result": "review report rendered; history entry saved at 2026-10-31 11:55:41; report title عقد إيجار سكني",
+      "evidence": "live browser showed تقرير مراجعة العقد, مراجعة أولية — ليست استشارة قانونية, and history card with عرض/حذف"
+    }
+  ],
+  "interpretation": [
+    "The 401 results support rejection of unauthenticated synthetic requests and the upload guard.",
+    "The web-search 404 is a live endpoint/configuration discrepancy, not a security pass.",
+    "The Supabase checks do not establish cross-user RLS isolation because no authenticated synthetic accounts were created and no row values were read.",
+    "No SQL was applied and no live database configuration was changed.",
+    "A synthetic demo account was created in the authorized browser and a text-only contract review completed. This does not prove PDF/DOCX upload, every other service, webhook success, or cross-user RLS isolation."
+  ]
+}

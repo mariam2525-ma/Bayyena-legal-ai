@@ -1,0 +1,933 @@
+{
+  "name": "Workflow 4 - Legal Research (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legal-ai/research",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -2960,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2736,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2512,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { status: 'accepted', job_id: $('Webhook').first().json.body.job_id || null } }}",
+        "options": {}
+      },
+      "name": "Ack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2304,
+        -528
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// يقبل الأسماء الإنجليزية من الموقع ويحوّلها لأسماء الحقول العربية التي تستخدمها باقي العقد\nconst w = $('Webhook').first();\nconst u = $('Verify User').first().json;\nconst b = w.body || w.json.body || {};\nconst body = w.json.body || {};\nconst type = String(body['نوع العقد محل الاستشارة'] || body.contract_type || '').trim();\nconst normType = type === 'عقد إيجار سكني' ? 'عقد إيجار شقة سكنية' : type;\nconst role = String(body['صفة السائل'] || body.user_role || '').trim();\nconst q = String(body['موضوع أو سؤال الاستشارة'] || body.question || '').trim();\nreturn [{ json: { ...body, 'نوع العقد محل الاستشارة': normType, 'صفة السائل': role, 'موضوع أو سؤال الاستشارة': q, user_id: u.id, user_email: u.email }, binary: w.binary }];"
+      },
+      "name": "Question Form",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2032,
+        -368
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=صنّف الاستشارة التالية تصنيفاً قانونياً دقيقاً وفق القانون المصري فقط:\n\nنوع العقد: {{ $('Question Form').item.json['نوع العقد محل الاستشارة'] }}\nصفة السائل: {{ $('Question Form').item.json['صفة السائل'] }}\nسؤال الاستشارة: {{ $('Question Form').item.json['موضوع أو سؤال الاستشارة'] }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت مستشار قانوني مصري متخصص حصرياً في مجالين: (1) عقود إيجار الشقق السكنية، (2) عقود بيع السيارات. لا تتناول أي قانون غير مصري.\nمهمتك تصنيف الاستشارة داخل القواعد القانونية المصرية:\n- لعقود إيجار الشقق: القانون رقم 4 لسنة 1996، مواد الإيجار في القانون المدني (المواد 558 وما بعدها)، إجراءات الطرد والإخلاء، الصيغة التنفيذية، منازعات مبلغ التأمين.\n- لعقود بيع السيارات: مواد البيع وضمان العيوب الخفية وضمان التعرض والاستحقاق في القانون المدني، قانون المرور المصري، قواعد توكيلات الشهر العقاري، المخالفات المرورية السابقة على البيع، التسليم الفعلي مقابل نقل الترخيص.\nأخرج تصنيفاً موجزاً يتضمن: المجال، الموضوع الرئيسي، المسائل القانونية الفرعية، صفة السائل وأثرها، والتشريعات المرجعية المحتملة. إذا كان السؤال خارج المجالين فاذكر ذلك صراحة."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Query Classification",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1808,
+        -368
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Classification",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1728,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Question Form').item.json['نوع العقد محل الاستشارة'] }}\nصفة السائل: {{ $('Question Form').item.json['صفة السائل'] }}\nسؤال الاستشارة: {{ $('Question Form').item.json['موضوع أو سؤال الاستشارة'] }}\n\nالتصنيف القانوني:\n{{ $json.text }}\n\nاستخرج المصادر القانونية المصرية المنطبقة.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت باحث قانوني مصري. استرجع المصادر القانونية المصرية المحددة المنطبقة على الاستشارة فقط (إيجار شقة سكنية أو بيع سيارة):\n1) المواد التشريعية بأرقامها ونصها أو مضمونها: القانون رقم 4 لسنة 1996، القانون المدني المصري، قانون المرور رقم 66 لسنة 1973 وتعديلاته، قانون الشهر العقاري والتوثيق، وقانون المرافعات عند الحاجة (الصيغة التنفيذية، الإخلاء).\n2) المبادئ المستقرة لمحكمة النقض المصرية (أحكام محكمة النقض) ذات الصلة مع رقم الطعن والسنة القضائية إن كنت متأكداً منهما.\nقواعد صارمة: لا تختلق أرقام مواد أو طعون. إذا لم تكن متأكداً من رقم طعن بعينه فاذكر المبدأ القضائي دون رقم ونبّه إلى ضرورة التحقق. رتّب المخرجات تحت عنوانين: \"المواد التشريعية\" و\"مبادئ محكمة النقض\"."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Search Legal Sources",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1456,
+        -368
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Sources",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1376,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Question Form').item.json['نوع العقد محل الاستشارة'] }}\nصفة السائل: {{ $('Question Form').item.json['صفة السائل'] }}\nسؤال الاستشارة: {{ $('Question Form').item.json['موضوع أو سؤال الاستشارة'] }}\n\nالتصنيف القانوني:\n{{ $('Query Classification').item.json.text }}\n\nالمصادر القانونية المسترجعة:\n{{ $json.text }}\n\nصُغ الاستشارة القانونية.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت محامٍ مصري خبير. صُغ استشارة قانونية مصرية متينة تجيب مباشرة عن سؤال السائل بحسب صفته، مستشهداً بأرقام المواد التشريعية ومبادئ محكمة النقض الواردة في المصادر المسترجعة فقط.\nأخرج النتيجة بصيغة HTML فقط (بدون Markdown وبدون علامات ```)، مستخدماً الوسوم h2 و p و ul و li و strong فقط، وبالأقسام الثلاثة التالية بالترتيب:\n<h2>ملخص الرأي القانوني الحاسم</h2> ... إجابة مباشرة وحاسمة.\n<h2>المواد التشريعية المنطبقة</h2> ... قائمة بالمواد مصنفة حسب: قانون 4 لسنة 1996 / القانون المدني / قانون المرور (بحسب نوع العقد).\n<h2>مبادئ وأحكام محكمة النقض المصرية</h2> ... المبادئ القضائية وأثرها على الحالة."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Build Cited Answer",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1104,
+        -368
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Answer",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1024,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Question Form').item.json['نوع العقد محل الاستشارة'] }}\nصفة السائل: {{ $('Question Form').item.json['صفة السائل'] }}\nسؤال الاستشارة: {{ $('Question Form').item.json['موضوع أو سؤال الاستشارة'] }}\n\nالمصادر القانونية:\n{{ $('Search Legal Sources').item.json.text }}\n\nمسودة الاستشارة:\n{{ $json.text }}\n\nقيّم درجة الثقة وحدد الشروط الإجرائية.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت مراجع قانوني مصري أول. راجع مسودة الاستشارة وقيّم درجة الثقة فيها باختيار واحد فقط من: مرتفعة جداً / مرتفعة / متوسطة، مع تعليل موجز.\nثم حدد الشروط والنصائح الإجرائية العملية الواجب مراعاتها، مثل: الإنذار الكتابي على يد محضر، التصديق والتوثيق في الشهر العقاري، شهادة البيانات/المخالفات المرورية (المخالصة)، إثبات تاريخ العقد، استخراج الصيغة التنفيذية، ومحاضر الاستلام والتسليم — بحسب ما ينطبق على الحالة.\nأخرج النتيجة بصيغة HTML فقط (بدون Markdown وبدون علامات ```)، باستخدام h2 و p و ul و li و strong فقط، تحت عنوان واحد:\n<h2>درجة الثقة والنصائح الإجرائية العملية</h2>\nواختم بتنبيه أن هذه الاستشارة استرشادية ولا تغني عن مراجعة محامٍ مختص."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Confidence Check",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -752,
+        -368
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Confidence",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "status",
+              "value": "done",
+              "type": "string"
+            },
+            {
+              "name": "report",
+              "value": "=<div dir=\"rtl\" style=\"font-family: Tahoma, Arial, sans-serif; text-align: right; line-height: 1.9; max-width: 820px; margin: 0 auto; padding: 24px; color: #1f2937;\">\n<h1 style=\"color:#0f3d5e; border-bottom: 3px solid #c9a227; padding-bottom: 8px;\">مُحكَم — الرأي القانوني</h1>\n<p><strong>نوع العقد:</strong> {{ $('Question Form').item.json['نوع العقد محل الاستشارة'] }} &nbsp;|&nbsp; <strong>صفة السائل:</strong> {{ $('Question Form').item.json['صفة السائل'] }}</p>\n<p style=\"background:#f3f4f6; padding:12px; border-radius:8px;\"><strong>السؤال:</strong> {{ $('Question Form').item.json['موضوع أو سؤال الاستشارة'] }}</p>\n{{ ($('Build Cited Answer').item.json.text || '').replace(/```html|```/g, '') }}\n<hr style=\"border:none; border-top:1px solid #e5e7eb; margin:24px 0;\">\n{{ ($json.text || '').replace(/```html|```/g, '') }}\n</div>",
+              "type": "string"
+            },
+            {
+              "name": "error",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Build Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        -368
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://dcuowxwpihkvqxbkpsxp.supabase.co/rest/v1/review_jobs?id=eq.{{ $('Webhook').first().json.body.job_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $('Webhook').first().json.headers.authorization || '' }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: $json.status, report: $json.report, error: $json.error }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Save Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -144,
+        -368
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2512,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "contract_type"
+            },
+            {
+              "name": "jurisdiction"
+            },
+            {
+              "name": "user_role"
+            },
+            {
+              "name": "question"
+            },
+            {
+              "name": "parties",
+              "type": "any"
+            },
+            {
+              "name": "facts",
+              "type": "any"
+            },
+            {
+              "name": "requested_clauses",
+              "type": "any"
+            },
+            {
+              "name": "contract_requirements"
+            },
+            {
+              "name": "job_id"
+            }
+          ]
+        }
+      },
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2752,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const i = $input.first().json || {};\nconst toText = v => v == null ? '' : (typeof v === 'string' ? v : JSON.stringify(v, null, 2));\nlet type = String(i.contract_type || '').trim();\nif (type === 'عقد إيجار سكني') type = 'عقد إيجار شقة سكنية';\nconst question = String(i.question || '').trim() || ('ما الأساس القانوني والقواعد المصرية المنطبقة على صياغة ' + (type || 'العقد') + '؟');\nconst searchQuery = ['القانون المصري', type, String(toText(i.requested_clauses)).slice(0, 120), question.slice(0, 160)].filter(Boolean).join(' ');\nreturn [{ json: {\n  contract_type: type,\n  jurisdiction: 'Egypt',\n  user_role: String(i.user_role || '').trim(),\n  question,\n  parties: toText(i.parties),\n  facts: toText(i.facts),\n  requested_clauses: toText(i.requested_clauses),\n  contract_requirements: toText(i.contract_requirements),\n  job_id: i.job_id ? String(i.job_id) : null,\n  search_query: searchQuery\n} }];"
+      },
+      "name": "Internal Research Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2320,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "zZHlHT2ouYaNs2jb",
+          "cachedResultName": "Legal AI - Fallback Web Search (secured)"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ $json.search_query }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "name": "Fallback Web Search",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -2096,
+        240
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=صنّف الاستشارة التالية تصنيفاً قانونياً دقيقاً وفق القانون المصري فقط:\n\nنوع العقد: {{ $('Internal Research Request').first().json.contract_type }}\nصفة السائل: {{ $('Internal Research Request').first().json.user_role || '[غير محدد]' }}\nسؤال الاستشارة: {{ $('Internal Research Request').first().json.question }}\nالأطراف: {{ $('Internal Research Request').first().json.parties || '[غير مذكور]' }}\nالوقائع: {{ $('Internal Research Request').first().json.facts || '[غير مذكور]' }}\nالبنود المطلوبة: {{ $('Internal Research Request').first().json.requested_clauses || '[غير مذكور]' }}\nمتطلبات المستخدم: {{ $('Internal Research Request').first().json.contract_requirements || '[غير مذكور]' }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت مستشار قانوني مصري متخصص حصرياً في مجالين: (1) عقود إيجار الشقق السكنية، (2) عقود بيع السيارات. لا تتناول أي قانون غير مصري.\nمهمتك تصنيف الاستشارة داخل القواعد القانونية المصرية:\n- لعقود إيجار الشقق: القانون رقم 4 لسنة 1996، مواد الإيجار في القانون المدني (المواد 558 وما بعدها)، إجراءات الطرد والإخلاء، الصيغة التنفيذية، منازعات مبلغ التأمين.\n- لعقود بيع السيارات: مواد البيع وضمان العيوب الخفية وضمان التعرض والاستحقاق في القانون المدني، قانون المرور المصري، قواعد توكيلات الشهر العقاري، المخالفات المرورية السابقة على البيع، التسليم الفعلي مقابل نقل الترخيص.\nأخرج تصنيفاً موجزاً يتضمن: المجال، الموضوع الرئيسي، المسائل القانونية الفرعية، صفة السائل وأثرها، والتشريعات المرجعية المحتملة. إذا كان السؤال خارج المجالين فاذكر ذلك صراحة."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Internal Query Classification",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1872,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=نوع العقد: {{ $('Internal Research Request').first().json.contract_type }}\nسؤال الاستشارة: {{ $('Internal Research Request').first().json.question }}\nالوقائع: {{ $('Internal Research Request').first().json.facts || '[غير مذكور]' }}\nالبنود المطلوبة: {{ $('Internal Research Request').first().json.requested_clauses || '[غير مذكور]' }}\n\nالتصنيف القانوني:\n{{ $json.text }}\n\nنتائج البحث على الويب (مصادر مسترجعة فعلياً، غير متحقق منها قانونياً):\n{{ $('Fallback Web Search').first().json.context || '[فشل استرجاع مصادر الويب أو لم تُسترجع نتائج]' }}\n\nاستخرج المصادر القانونية المصرية المنطبقة.",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت باحث قانوني مصري. استرجع المصادر القانونية المصرية المحددة المنطبقة على الاستشارة فقط (إيجار شقة سكنية أو بيع سيارة):\n1) المواد التشريعية بأرقامها ونصها أو مضمونها: القانون رقم 4 لسنة 1996، القانون المدني المصري، قانون المرور رقم 66 لسنة 1973 وتعديلاته، قانون الشهر العقاري والتوثيق، وقانون المرافعات عند الحاجة (الصيغة التنفيذية، الإخلاء).\n2) المبادئ المستقرة لمحكمة النقض المصرية (أحكام محكمة النقض) ذات الصلة مع رقم الطعن والسنة القضائية إن كنت متأكداً منهما.\nقواعد صارمة: لا تختلق أرقام مواد أو طعون. إذا لم تكن متأكداً من رقم طعن بعينه فاذكر المبدأ القضائي دون رقم ونبّه إلى ضرورة التحقق. رتّب المخرجات تحت عنوانين: \"المواد التشريعية\" و\"مبادئ محكمة النقض\".\nعند الاستناد إلى نتيجة بحث ويب اذكر رقمها [n] ورابطها كما ورد حرفياً فقط. لا تذكر أي رابط غير وارد في نتائج البحث."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Internal Search Legal Sources",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1520,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=طلب البحث:\n- نوع العقد: {{ $('Internal Research Request').first().json.contract_type }}\n- الاختصاص: مصر\n- صفة السائل: {{ $('Internal Research Request').first().json.user_role || '[غير محدد]' }}\n- السؤال: {{ $('Internal Research Request').first().json.question }}\n- الأطراف: {{ $('Internal Research Request').first().json.parties || '[غير مذكور]' }}\n- الوقائع: {{ $('Internal Research Request').first().json.facts || '[غير مذكور]' }}\n- البنود المطلوبة: {{ $('Internal Research Request').first().json.requested_clauses || '[غير مذكور]' }}\n- متطلبات المستخدم: {{ $('Internal Research Request').first().json.contract_requirements || '[غير مذكور]' }}\n\nالتصنيف القانوني:\n{{ $('Internal Query Classification').first().json.text }}\n\nالمصادر القانونية المستخرجة:\n{{ $json.text }}\n\nنتائج البحث على الويب (الروابط المسموح بها فقط):\n{{ $('Fallback Web Search').first().json.context || '[لا توجد مصادر ويب مسترجعة]' }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "أنت باحث قانوني مصري. حوّل البحث إلى كائن JSON واحد صالح فقط، بدون Markdown وبدون أي نص خارجه، بالمفاتيح التالية بالضبط:\n{\n \"legal_basis\": \"ملخص الأساس القانوني المصري (نص عربي)\",\n \"applicable_rules\": [{\"rule\": \"...\", \"law\": \"اسم القانون\", \"article\": \"رقم المادة أو [يتطلب التحقق]\", \"effect_on_contract\": \"...\"}],\n \"sources\": [{\"title\": \"...\", \"citation\": \"القانون/المادة أو مبدأ النقض\", \"url\": \"رابط من نتائج البحث فقط أو null\", \"type\": \"legislation|cassation|web\"}],\n \"citations\": [{\"claim\": \"...\", \"source_title\": \"...\", \"article_or_ref\": \"...\", \"url\": \"رابط من نتائج البحث فقط أو null\"}],\n \"uncertainty\": \"منخفضة|متوسطة|مرتفعة مع التعليل\",\n \"limitations\": [\"...\"],\n \"missing_facts\": [\"وقائع أو بيانات ناقصة تؤثر على الصياغة\"]\n}\nقواعد صارمة: لا تختلق أرقام مواد أو طعون أو روابط. أي رابط غير وارد حرفياً في نتائج البحث اجعله null. ضع في missing_facts كل بيان غير مذكور لازم للعقد، وفي limitations كل نقطة تحتاج مراجعة محامٍ."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "name": "Internal Structured Research",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1168,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final node of the internal path: its output is returned synchronously to the calling workflow.\nconst req = $('Internal Research Request').first().json;\nlet web = {};\ntry { web = $('Fallback Web Search').first().json || {}; } catch (e) { web = {}; }\nconst retrieved = (Array.isArray(web.sources) ? web.sources : []).filter(s => s && typeof s.url === 'string' && s.url.startsWith('http'));\nconst allowed = new Set(retrieved.map(s => s.url));\nconst webOk = web.retrieval_status === 'ok' && retrieved.length > 0;\nconst raw = String($input.first().json.text || '');\nlet p = {};\nlet parseError = '';\ntry {\n  const t = raw.replace(/\\x60\\x60\\x60json|\\x60\\x60\\x60/g, '').trim();\n  p = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1));\n} catch (e) { parseError = 'Structured research output could not be parsed as JSON.'; }\nconst arr = v => Array.isArray(v) ? v : (v ? [v] : []);\nconst safeUrl = u => (typeof u === 'string' && allowed.has(u)) ? u : null;\nconst sources = [\n  ...retrieved.map(s => ({ title: s.title || '', citation: '', url: s.url, snippet: s.snippet || '', type: 'web', retrieved: true, verification_status: 'unverified - retrieved from web, requires human legal review' })),\n  ...arr(p.sources).map(s => { const o = typeof s === 'string' ? { title: s } : (s || {}); const url = safeUrl(o.url); return { title: o.title || '', citation: o.citation || '', url, type: o.type || 'model_knowledge', retrieved: !!url, verification_status: url ? 'unverified - retrieved from web, requires human legal review' : 'unverified - not retrieved, from model knowledge' }; })\n];\nconst citations = arr(p.citations).map(c => { const o = typeof c === 'string' ? { claim: c } : (c || {}); const url = safeUrl(o.url); return { claim: o.claim || '', source_title: o.source_title || '', article_or_ref: o.article_or_ref || '', url, verification_status: url ? 'retrieved' : 'unverified' }; });\nconst limitations = arr(p.limitations).map(String);\nif (!webOk) limitations.push('Web source retrieval failed or returned no results' + (web.error ? (': ' + web.error) : '') + '. All sources are unverified model knowledge.');\nif (parseError) limitations.push(parseError);\nlimitations.push('Research is advisory and must be reviewed by a licensed Egyptian lawyer before use.');\nreturn [{ json: {\n  status: parseError ? 'partial' : 'done',\n  jurisdiction: 'Egypt',\n  contract_type: req.contract_type,\n  legal_basis: p.legal_basis || (parseError ? raw : ''),\n  applicable_rules: arr(p.applicable_rules),\n  sources,\n  citations,\n  source_urls: retrieved.map(s => s.url),\n  uncertainty: p.uncertainty || (webOk ? 'متوسطة' : 'مرتفعة - لم تُسترجع مصادر ويب'),\n  limitations,\n  missing_facts: arr(p.missing_facts).map(String),\n  web_retrieval_status: webOk ? 'ok' : 'failed',\n  requires_human_review: true,\n  job_id: req.job_id\n} }];"
+      },
+      "name": "Build Research Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Internal Classification",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1792,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.2
+        }
+      },
+      "name": "Gemini – Internal Sources",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1440,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "maxOutputTokens": 8192,
+          "temperature": 0.1
+        }
+      },
+      "name": "Gemini – Internal Structured",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -1088,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { status: 'error', report: null, error: 'تعذّر إكمال المعالجة بسبب خطأ مؤقت. أعد المحاولة، وإن تكرر الأمر تواصل مع الدعم.' } }];"
+      },
+      "name": "Processing Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        -108
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Ack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ack": {
+      "main": [
+        [
+          {
+            "node": "Question Form",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Question Form": {
+      "main": [
+        [
+          {
+            "node": "Query Classification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Classification": {
+      "main": [
+        [
+          {
+            "node": "Search Legal Sources",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Classification": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Query Classification",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Legal Sources": {
+      "main": [
+        [
+          {
+            "node": "Build Cited Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Sources": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Search Legal Sources",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Cited Answer": {
+      "main": [
+        [
+          {
+            "node": "Confidence Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Answer": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Build Cited Answer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence Check": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processing Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Confidence": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Confidence Check",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Response": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Research Request": {
+      "main": [
+        [
+          {
+            "node": "Fallback Web Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fallback Web Search": {
+      "main": [
+        [
+          {
+            "node": "Internal Query Classification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Query Classification": {
+      "main": [
+        [
+          {
+            "node": "Internal Search Legal Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Search Legal Sources": {
+      "main": [
+        [
+          {
+            "node": "Internal Structured Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Structured Research": {
+      "main": [
+        [
+          {
+            "node": "Build Research Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Internal Classification": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Internal Query Classification",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Internal Sources": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Internal Search Legal Sources",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini – Internal Structured": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Internal Structured Research",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Internal Research Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processing Error": {
+      "main": [
+        [
+          {
+            "node": "Save Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [
+    {
+      "name": "Research for drafting",
+      "nodeIds": [
+        "ec92f098-dd3b-4944-ad45-46a846af5735",
+        "48bf49b7-e56a-4594-91a5-795d0e41ecd0",
+        "b910024a-7903-479c-ae85-d622e6f3e99e",
+        "cdcc7748-b7e5-4ec0-9a92-3a8a7894a6db",
+        "e3f34ec2-d10f-4da4-903e-a980109cd8a1",
+        "96d02f89-4db0-4ee5-90fd-a7ddb323863e",
+        "b6283362-a7a8-45e9-8ad9-1720a1f2132e",
+        "f185fe4a-d2af-467f-ae65-9b875b31bea6",
+        "3a47d0f2-61f6-44c5-8f3e-fac70069857d"
+      ],
+      "description": "For calls from the drafting workflow: retrieves real web sources, researches Egyptian law, and returns a structured, cited result"
+    }
+  ],
+  "tags": []
+}

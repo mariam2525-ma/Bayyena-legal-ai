@@ -1,0 +1,597 @@
+{
+  "name": "Workflow 8 - Conditional External Web Search (Serper + Gemini)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legal-ai/web-search",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Search Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || $json.headers.Authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Search Request Webhook').first().json.body.allow_web_search }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Ask Permission or Rule",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1136,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ q: $('Search Request Webhook').first().json.body.question || $('Search Request Webhook').first().json.body.message || '', gl: 'eg', hl: 'ar', num: 5 }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "name": "Web Search (Serper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1712,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// لا يرمي أخطاء أبدًا: أي فشل في البحث يرجع كنتيجة \"failed\" بدل ما يوقع الـ workflow\nconst req = $('Search Request Webhook').first().json.body || {};\nconst question = String(req.question || req.message || '');\nconst p = $input.first().json || {};\nlet error = '';\nif (p.error) { const e = p.error; error = 'Serper error: ' + (typeof e === 'string' ? e : (e.message || e.status || JSON.stringify(e))); }\nconst results = Array.isArray(p.organic) ? p.organic : [];\nconst sources = results\n  .filter(r => r && typeof r.link === 'string' && r.link.startsWith('http') && !/forum|quora/i.test(r.link))\n  .slice(0, 5)\n  .map((r, i) => ({ index: i + 1, title: r.title || '', url: r.link, snippet: r.snippet || '' }));\nconst context = sources.map(s => 'المصدر [' + s.index + ']: ' + s.title + '\\nالرابط: ' + s.url + '\\nالمقتطف: ' + s.snippet).join('\\n\\n');\nreturn [{ json: { question, retrieval_status: sources.length ? 'ok' : 'failed', error, sources, source_urls: sources.map(s => s.url), context } }];"
+      },
+      "name": "Filter Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.retrieval_status }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Results Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2336,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ contents: [{ parts: [{ text: 'أنت باحث قانوني. بناءً على نتائج البحث التالية فقط، أجب عن السؤال مع اقتباس المصادر برقمها (مثال: [1]). لا تذكر أي رابط أو مصدر غير وارد في النتائج.\\n\\nالنتائج:\\n' + $json.context + '\\n\\nالسؤال: ' + $json.question }] }] }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Cite Search Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2512,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const f = $('Filter Sources').first().json || {};\nconst sources = f.sources || [];\nlet text = '';\ntry {\n  const r = $json || {};\n  text = ((r.candidates && r.candidates[0] && r.candidates[0].content && r.candidates[0].content.parts) || []).map(p => p.text || '').join('');\n} catch (e) {}\nif (!text) text = 'تعذّر تلخيص النتائج حاليًا. هذه المصادر التي تم العثور عليها:\\n' + sources.map(s => s.index + '. ' + s.title + ' — ' + s.url).join('\\n');\nconst disclaimer = \"\\n\\n⚠️ **تنويه:** هذه الإجابة مستخرجة من مصادر خارجية عبر الويب ولم يتم التحقق منها من قاعدة المعرفة الداخلية. يرجى مراجعة المصادر المرفقة للتأكد من الدقة.\";\nreturn [{ json: { final_answer: text + disclaimer, source: 'external_web', retrieval_status: 'ok', sources, source_urls: f.source_urls || [] } }];"
+      },
+      "name": "Mark as External",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2736,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { final_answer: 'تعذّر جلب مصادر خارجية الآن. حاول مرة أخرى بعد قليل.', source: 'external_web', retrieval_status: 'failed', sources: [], source_urls: [] } }];"
+      },
+      "name": "No Results Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2512,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond to User",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"final_answer\": \"تم إيقاف البحث عبر الويب بناءً على الإعدادات.\",\n  \"source\": \"blocked\"\n}",
+        "options": {}
+      },
+      "name": "Respond Blocked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2432,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        528,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ q: $json.question || $json.query || $json.message || '', gl: 'eg', hl: 'ar', num: 10 }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Internal Web Search (Serper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        256,
+        1056
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keeps only URLs actually returned by the search API. Never fabricates URLs.\nconst req = $('When Executed by Another Workflow').first().json || {};\nconst all = $input.all().map(i => i.json || {});\nconst question = String(req.question || req.query || req.message || '');\nlet error = '';\nconst errItem = all.find(p => p.error);\nif (errItem) { const e = errItem.error; error = 'Serper API error: ' + (typeof e === 'string' ? e : (e.message || e.status || JSON.stringify(e))); }\nconst results = [];\nfor (const p of all) { if (Array.isArray(p.organic)) results.push(...p.organic); else if (p.link) results.push(p); }\nconst sources = results\n  .filter(r => r && typeof r.link === 'string' && r.link.startsWith('http') && !r.link.toLowerCase().includes('forum') && !r.link.toLowerCase().includes('quora'))\n  .slice(0, 5)\n  .map((r, i) => ({ index: i + 1, title: r.title || '', url: r.link, snippet: r.snippet || '', retrieved: true, retrieved_via: 'serper_web_search' }));\nif (!error && sources.length === 0) error = 'No web results were retrieved for this query.';\nconst context = sources.map(s => 'المصدر [' + s.index + ']: ' + s.title + '\\nالرابط: ' + s.url + '\\nالمقتطف: ' + s.snippet).join('\\n\\n');\nreturn [{ json: { question, retrieval_status: sources.length ? 'ok' : 'failed', error, sources, source_urls: sources.map(s => s.url), context } }];"
+      },
+      "name": "Internal Filter Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.retrieval_status }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Sources Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        704,
+        1056
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({ contents: [{ parts: [{ text: 'أنت باحث قانوني مصري. بناءً على نتائج البحث التالية فقط، لخّص ما تقوله عن السؤال مع اقتباس المصادر برقمها (مثال: [1]). لا تذكر أي رابط أو مصدر غير وارد في النتائج.\\n\\nالنتائج:\\n' + $json.context + '\\n\\nالسؤال: ' + $json.question }] }] }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Internal Cite Search Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        864
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Internal Filter Sources').first().json || {};\nlet cited = '';\nlet citeError = '';\ntry {\n  const r = $('Internal Cite Search Results').first().json || {};\n  if (r.error) citeError = 'Citation step error: ' + (typeof r.error === 'string' ? r.error : (r.error.message || JSON.stringify(r.error)));\n  cited = ((r.candidates && r.candidates[0] && r.candidates[0].content && r.candidates[0].content.parts) || []).map(p => p.text || '').join('');\n} catch (e) {}\nreturn [{ json: {\n  source: 'external_web',\n  retrieval_status: base.retrieval_status || 'failed',\n  question: base.question || '',\n  sources: base.sources || [],\n  source_urls: base.source_urls || [],\n  context: base.context || '',\n  cited_answer: cited,\n  error: [base.error, citeError].filter(Boolean).join(' | '),\n  disclaimer: 'مصادر خارجية من الويب لم يتم التحقق منها قانونياً؛ يجب مراجعتها قبل الاعتماد عليها.'\n} }];"
+      },
+      "name": "Internal Structured Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        1072
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Search Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Ask Permission or Rule",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Permission or Rule": {
+      "main": [
+        [
+          {
+            "node": "Web Search (Serper)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Web Search (Serper)": {
+      "main": [
+        [
+          {
+            "node": "Filter Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Sources": {
+      "main": [
+        [
+          {
+            "node": "Results Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Results Found?": {
+      "main": [
+        [
+          {
+            "node": "Cite Search Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Results Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cite Search Results": {
+      "main": [
+        [
+          {
+            "node": "Mark as External",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as External": {
+      "main": [
+        [
+          {
+            "node": "Respond to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Results Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Internal Web Search (Serper)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Web Search (Serper)": {
+      "main": [
+        [
+          {
+            "node": "Internal Filter Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Filter Sources": {
+      "main": [
+        [
+          {
+            "node": "Sources Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sources Found?": {
+      "main": [
+        [
+          {
+            "node": "Internal Cite Search Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Internal Structured Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Internal Cite Search Results": {
+      "main": [
+        [
+          {
+            "node": "Internal Structured Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

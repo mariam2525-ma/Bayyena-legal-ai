@@ -1,0 +1,672 @@
+{
+  "name": "Legal AI - Full Cloud Workflow (Gemini Flash OCR) - Fixed",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "legal-ai/knowledge/ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Knowledge Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.body && $json.body.pdf_url ? String($json.body.pdf_url).trim() : \"\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Has PDF URL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        608,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json._safe_pdf_url }}",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 0
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "name": "Download PDF from URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const MAX_PDF_BYTES = 20 * 1024 * 1024;\nconst item = $input.first();\nconst binaryKeys = Object.keys(item.binary || {});\nif (binaryKeys.length === 0) {\n  const body = (item.json && item.json.body) || {};\n  let b64 = String(body.pdf_base64 || '').trim();\n  if (!b64) {\n    throw new Error('No file was uploaded. Send the PDF as multipart/form-data (field \"data\", type File), or as JSON with \"pdf_base64\" or \"pdf_url\".');\n  }\n  b64 = b64.replace(/^data:[^;,]*;base64,/i, '').replace(/\\s+/g, '');\n  const decoded = Buffer.from(b64, 'base64');\n  if (decoded.length > MAX_PDF_BYTES) throw new Error('PDF exceeds the 20 MiB ingestion limit.');\n  if (decoded.slice(0, 5).toString('latin1') !== '%PDF-') {\n    throw new Error('pdf_base64 does not decode to a PDF. Encode the raw PDF file bytes as standard base64.');\n  }\n  const bin = await this.helpers.prepareBinaryData(decoded, String(body.file_name || 'file.pdf'), 'application/pdf');\n  return [{ json: { pdf_base64: decoded.toString('base64'), file_name: String(body.file_name || ''), mime_type: 'application/pdf' }, binary: { data: bin } }];\n}\nconst key = binaryKeys.includes('data') ? 'data' : binaryKeys[0];\nconst buffer = await this.helpers.getBinaryDataBuffer(0, key);\nif (buffer.length > MAX_PDF_BYTES) throw new Error('PDF exceeds the 20 MiB ingestion limit.');\nif (buffer.slice(0, 5).toString('latin1') !== '%PDF-') {\n  throw new Error('The received file is not a PDF. For uploads, send multipart/form-data with the field type set to File. For pdf_url, make sure the link is public and points directly to a PDF.');\n}\nlet replacementChars = 0;\nfor (let i = 0; i + 2 < Math.min(buffer.length, 200000); i++) {\n  if (buffer[i] === 0xEF && buffer[i + 1] === 0xBF && buffer[i + 2] === 0xBD) replacementChars++;\n}\nif (replacementChars > 50) {\n  throw new Error('The PDF arrived corrupted (binary bytes were converted to text by the sender). In Postman use the Desktop Agent and set the form-data key type to File, or use curl -F \"data=@file.pdf;type=application/pdf\".');\n}\nreturn [{ json: { pdf_base64: buffer.toString('base64'), file_name: item.binary[key].fileName || '', mime_type: item.binary[key].mimeType || 'application/pdf' }, binary: { data: item.binary[key] } }];"
+      },
+      "name": "PDF to Base64",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  contents: [{ parts: [\n    { text: \"المرفق ملف PDF لمستند قانوني. مهمتك OCR فقط: انسخ النص الظاهر في الصفحات كما هو، صفحة بصفحة، دون إضافة أو حذف أو إعادة صياغة أو تلخيص. اكتب في السطر الأول فقط: CLASS: ثم كلمة واحدة تصنّف المستند (عقد، قانون، حكم_قضائي، لائحة). ثم اترك سطراً فارغاً واكتب النص الكامل كنص عادي بدون JSON وبدون علامات ```.\" },\n    { inline_data: { mime_type: \"application/pdf\", data: $('PDF to Base64').item.json.pdf_base64 } }\n  ] }],\n  generationConfig: { temperature: 0.7, maxOutputTokens: 65535, thinkingConfig: { thinkingLevel: \"minimal\" } }\n}) }}",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "name": "Gemini Flash OCR & Classify",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1568,
+        736
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const cand = $json.candidates?.[0] || {};\nconst finishReason = cand.finishReason || '';\nlet raw = (cand.content?.parts || []).map(p => p.text || '').join('').trim();\n\nif (!raw) {\n  throw new Error('Gemini رجّع رد فاضي (finishReason: ' + finishReason + ').' +\n    (finishReason === 'RECITATION' ? ' جرّب إعادة التشغيل أو قسّم الـ PDF.' : ''));\n}\n\n// أول سطر: CLASS: <كلمة>، وبعده النص\nlet classification = 'غير_محدد';\nlet text = raw;\nconst m = raw.match(/^\\s*CLASS:\\s*([^\\n\\r]+)/i);\nif (m) {\n  classification = m[1].trim().replace(/\\s+/g, '_');\n  text = raw.slice(m[0].length).trim();\n}\n\nif (text.length < 20) {\n  throw new Error('لم يتم استخراج نص كافٍ. classification: ' + classification + ' | finishReason: ' + finishReason);\n}\n\nreturn [{\n  json: {\n    text,\n    classification,\n    truncated: finishReason === 'MAX_TOKENS',\n    finish_reason: finishReason\n  }\n}];\n"
+      },
+      "name": "Parse Gemini Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1904,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nlet text = String(input.text || '').replace(/\\s+/g, ' ').trim();\nconst classification = input.classification || 'unknown';\nlet fileName = '';\ntry { fileName = String($('PDF to Base64').first().json.file_name || ''); } catch (e) { fileName = ''; }\nlet title = fileName.replace(/\\.pdf$/i, '').trim();\nif (!title) title = text.slice(0, 80).trim() || ('مستند ' + classification);\n\nconst documentId = 'doc-' + Date.now();\nconst chunkSize = 3500, overlap = 350, step = chunkSize - overlap;\nconst output = [];\n\nfor (let start = 0, index = 0; start < text.length; start += step, index++) {\n  const piece = text.slice(start, start + chunkSize).trim();\n  if (piece) {\n    output.push({\n      json: {\n        document_id: documentId,\n        chunk_id: documentId + '-' + index,\n        chunk_index: index,\n        document_type: classification,\n        title: title,\n        text: piece,\n        truncated: !!input.truncated\n      }\n    });\n  }\n}\nreturn output;"
+      },
+      "name": "Normalize and Chunk",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3472,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: \"models/gemini-embedding-001\", content: { parts: [{ text: $json.text }] }, taskType: \"RETRIEVAL_DOCUMENT\", outputDimensionality:  1536 } }}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 10000
+            }
+          },
+          "timeout": 120000
+        }
+      },
+      "name": "Create Source Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3696,
+        16
+      ],
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 15000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/rest/v1/bayyena_knowledge",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  document_id: $('Normalize and Chunk').item.json.document_id,\n  chunk_id: $('Normalize and Chunk').item.json.chunk_id,\n  chunk_index: $('Normalize and Chunk').item.json.chunk_index,\n  title: $('Normalize and Chunk').item.json.title,\n  document_type: $('Normalize and Chunk').item.json.document_type,\n  content: $('Normalize and Chunk').item.json.text,\n  embedding: $json.embedding.values\n} }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "name": "Insert Knowledge Chunk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3920,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ { status: $('Normalize and Chunk').first().json.truncated ? 'indexed_partial' : 'indexed', chunks_processed: $('Normalize and Chunk').all().length, classification: $('Normalize and Chunk').first().json.document_type, truncated: $('Normalize and Chunk').first().json.truncated, note: $('Normalize and Chunk').first().json.truncated ? 'الملف طويل وتم قطع الاستخراج عند حد الـ tokens؛ قسّم الـ PDF لأجزاء.' : '' } }}",
+        "options": {}
+      },
+      "name": "Knowledge Indexed Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4240,
+        16
+      ],
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "formTitle": "رفع مستند قانوني",
+        "formDescription": "اختر ملف PDF (عقد، قانون، حكم، لائحة) ليتم استخراج نصه وإضافته إلى قاعدة المعرفة.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "ملف PDF",
+              "fieldType": "file",
+              "fieldName": "data",
+              "multipleFiles": false,
+              "acceptFileTypes": ".pdf",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "buttonLabel": "رفع المستند",
+          "path": "legal-ai-upload",
+          "respondWithOptions": {
+            "values": {
+              "formSubmittedText": "تم استلام المستند، وجاري استخراج النص وإضافته إلى قاعدة المعرفة."
+            }
+          }
+        }
+      },
+      "name": "Legal Document Upload Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        16,
+        368
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "name": "Extract PDF Text",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        1232,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ (String($json.text || '').replace(/\\s+/g, '').length / Math.max(Number($json.numpages) || 1, 1)) > 150 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Has Text Layer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1456,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = String($json.text || '').trim();\nconst head = text.slice(0, 3000);\nlet classification = 'غير_محدد';\nif (/باسم الشعب|حكمت المحكمة|منطوق الحكم|أسباب الحكم/.test(head)) classification = 'حكم_قضائي';\nelse if (/الطرف الأول|الطرف الثاني|حُرر هذا العقد|تحرر هذا العقد|عقد\\s/.test(head)) classification = 'عقد';\nelse if (/اللائحة التنفيذية|لائحة\\s/.test(head)) classification = 'لائحة';\nelse if (/قانون رقم|المادة\\s*\\(?\\d|مادة\\s*\\(?\\d/.test(head)) classification = 'قانون';\nreturn [{ json: { text, classification, truncated: false } }];"
+      },
+      "name": "Classify Text Layer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1616,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || $json.headers.Authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        16
+      ],
+      "id": "f21e0caf-7f65-418c-85a1-adf60ff6aff5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        16
+      ],
+      "id": "7c7fed5e-43f3-44b1-8946-f5742551ec4a"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        560
+      ],
+      "id": "5640f17e-b490-4e2a-b9a7-503bff664b41"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Knowledge Upload Webhook').first();\nconst verifiedUser = $('Verify User').first().json || {};\nif (!verifiedUser.id) throw new Error('Authentication required.');\nreturn [{ json: { body: (request.json && request.json.body) || {} }, binary: request.binary || {} }];"
+      },
+      "id": "ba0c39a4-621f-41db-96e0-43af137fdb32",
+      "name": "Restore Authenticated Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst raw = String((item.json && item.json.body && item.json.body.pdf_url) || '').trim();\nconst reject = () => { throw new Error('Rejected PDF URL: use an approved HTTPS Google Drive/Dropbox file link without userinfo, ports, fragments, or unsafe characters.'); };\nif (!raw || /[\\\\\\u0000-\\u0020\\u007f]/.test(raw) || /%(?:0[0-9a-f]|1[0-9a-f]|7f|5c)/i.test(raw) || /%(?![0-9a-f]{2})/i.test(raw)) reject();\n// Parse a deliberately narrow provider-link grammar, not arbitrary URLs.\n// Canonical output is rebuilt on a fixed allowlisted host; no modules or Web APIs are required.\nconst strictHttpsLink = /^https:\\/\\/([^/?#]+)(\\/[^?#]*)?(?:\\?([^#]*))?$/i.exec(raw);\nif (!strictHttpsLink) reject();\nconst host = strictHttpsLink[1].toLowerCase();\nconst allowedHosts = new Set(['drive.google.com', 'www.dropbox.com', 'dropbox.com']);\nif (!allowedHosts.has(host)) reject();\nconst path = strictHttpsLink[2] || '/';\nconst params = Object.create(null);\ntry {\n  const decodedPath = decodeURIComponent(path);\n  if (/[\\\\\\u0000-\\u001f\\u007f]/.test(decodedPath) || decodedPath.split('/').some(part => part === '.' || part === '..')) reject();\n  for (const part of (strictHttpsLink[3] || '').split('&')) {\n    if (!part) continue;\n    const separator = part.indexOf('=');\n    const key = decodeURIComponent(separator < 0 ? part : part.slice(0, separator));\n    const value = decodeURIComponent(separator < 0 ? '' : part.slice(separator + 1));\n    if (Object.prototype.hasOwnProperty.call(params, key)) reject();\n    params[key] = value;\n  }\n} catch { reject(); }\nlet safeUrl;\nif (host === 'drive.google.com') {\n  const pathMatch = /^\\/file\\/d\\/([A-Za-z0-9_-]+)(?:\\/(?:view|preview))?\\/?$/.exec(path);\n  const id = (pathMatch && pathMatch[1]) || (/^\\/(?:uc|open)$/.test(path) && params.id) || '';\n  if (!/^[A-Za-z0-9_-]+$/.test(id)) reject();\n  safeUrl = 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id);\n} else {\n  if (!/^\\/(?:s\\/|scl\\/fi\\/)[A-Za-z0-9_-]+\\/[^?#]+$/.test(path)) reject();\n  if (params.rlkey && !/^[A-Za-z0-9_-]+$/.test(params.rlkey)) reject();\n  safeUrl = 'https://www.dropbox.com' + path + '?' + (params.rlkey ? 'rlkey=' + encodeURIComponent(params.rlkey) + '&' : '') + 'dl=1';\n}\nreturn [{ json: { ...item.json, _safe_pdf_url: safeUrl }, binary: item.binary || {} }];"
+      },
+      "id": "1093227d-3e24-4f90-b82f-91a8553e8a54",
+      "name": "Validate PDF URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond Ingest Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        384
+      ],
+      "id": "bcdb340d-9d92-43ae-a343-11e006f7fd98"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Knowledge Upload Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify User",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has PDF URL?": {
+      "main": [
+        [
+          {
+            "node": "Validate PDF URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PDF to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF from URL": {
+      "main": [
+        [
+          {
+            "node": "PDF to Base64",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PDF to Base64": {
+      "main": [
+        [
+          {
+            "node": "Extract PDF Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Flash OCR & Classify": {
+      "main": [
+        [
+          {
+            "node": "Parse Gemini Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Gemini Output": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Chunk": {
+      "main": [
+        [
+          {
+            "node": "Create Source Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Source Embedding": {
+      "main": [
+        [
+          {
+            "node": "Insert Knowledge Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Knowledge Chunk": {
+      "main": [
+        [
+          {
+            "node": "Knowledge Indexed Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Legal Document Upload Form": {
+      "main": [
+        [
+          {
+            "node": "Has PDF URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PDF Text": {
+      "main": [
+        [
+          {
+            "node": "Has Text Layer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Text Layer?": {
+      "main": [
+        [
+          {
+            "node": "Classify Text Layer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gemini Flash OCR & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Text Layer": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Restore Authenticated Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Authenticated Payload": {
+      "main": [
+        [
+          {
+            "node": "Has PDF URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate PDF URL": {
+      "main": [
+        [
+          {
+            "node": "Download PDF from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Indexed Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [
+    {
+      "name": "Index knowledge chunks",
+      "nodeIds": [
+        "ce8bfbdb-3a9c-4b34-9f02-f46af4141d1e",
+        "854ca014-5f13-4b78-aafa-7ef333afec41",
+        "984d7177-b53c-4247-97e0-8f8bfc1c8113"
+      ],
+      "description": "Splits the text into overlapping chunks, embeds each one and saves it to the knowledge base for search"
+    }
+  ],
+  "tags": []
+}
