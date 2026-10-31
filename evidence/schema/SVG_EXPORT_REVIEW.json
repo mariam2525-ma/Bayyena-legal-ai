@@ -1,0 +1,108 @@
+{
+  "criterion": "7b",
+  "status": "PARTIAL",
+  "scope": "Visual columns/relationships only; not complete DDL or runtime proof",
+  "required_public_tables": [
+    "bayyena_knowledge",
+    "history",
+    "review_jobs",
+    "support_tickets"
+  ],
+  "assessment_method": "Secure XML parsing of table headers and supplied viewBox; no candidate qualifies for a full target-public-schema PNG. No visual completeness approval is claimed.",
+  "adequate_full_public_png": false,
+  "dashboard_fit_view_export_completed": false,
+  "new_login_attempted": false,
+  "missing_tables_fabricated": false,
+  "exports": [
+    {
+      "filename": "supabase-schema-dcuowxwpihkvqxbkpsxp(1).svg",
+      "bytes": 10173280,
+      "sha256": "a2cf72a5ce0c73b1797e5abfe3219d2feec689d6094a538ee9973600a753f389",
+      "width": "1285",
+      "height": "716",
+      "viewBox": "0 0 1285 716",
+      "viewport_transform": "translate(326.5px, -967px) scale(0.8)",
+      "table_headers": [
+        "audit_log_entries",
+        "schema_migrations",
+        "oauth_clients",
+        "oauth_authorizations",
+        "oauth_consents",
+        "oauth_client_states",
+        "custom_oauth_providers",
+        "webauthn_credentials",
+        "webauthn_challenges",
+        "mfa_recovery_code_sets",
+        "mfa_recovery_codes"
+      ],
+      "target_tables_present": []
+    },
+    {
+      "filename": "supabase-schema-dcuowxwpihkvqxbkpsxp(2).svg",
+      "bytes": 2135129,
+      "sha256": "4ce2faa4440bc90c37ed27f6e2864c1b90bb1ec3e62496183d1453b429446b60",
+      "width": "1285",
+      "height": "716",
+      "viewBox": "0 0 1285 716",
+      "viewport_transform": "translate(519.531px, 69.532px) scale(0.895151)",
+      "table_headers": [
+        "messages",
+        "schema_migrations",
+        "subscription"
+      ],
+      "target_tables_present": []
+    },
+    {
+      "filename": "supabase-schema-dcuowxwpihkvqxbkpsxp(3).svg",
+      "bytes": 7180974,
+      "sha256": "7875d9075efd836acfc2d8e7a40990eda1692f4bd7828cc5f49864070eb4ada8",
+      "width": "1285",
+      "height": "716",
+      "viewBox": "0 0 1285 716",
+      "viewport_transform": "translate(410.5px, -48.8px) scale(0.8)",
+      "table_headers": [
+        "migrations",
+        "buckets",
+        "objects",
+        "s3_multipart_uploads",
+        "s3_multipart_uploads_parts",
+        "buckets_analytics",
+        "buckets_vectors",
+        "vector_indexes"
+      ],
+      "target_tables_present": []
+    },
+    {
+      "filename": "supabase-schema-dcuowxwpihkvqxbkpsxp(5).svg",
+      "bytes": 821564,
+      "sha256": "bb3d33163fe5831d49e9f9ce6dbf1b46b704780fe7c3e62c626da0204740b683",
+      "width": "1285",
+      "height": "716",
+      "viewBox": "0 0 1285 716",
+      "viewport_transform": "translate(498.5px, 178px) scale(1.8)",
+      "table_headers": [
+        "secrets"
+      ],
+      "target_tables_present": []
+    }
+  ],
+  "remaining_action": "Fresh Supabase export with Schema=public, all required tables selected/visible, then Fit view; no live schema changes required.",
+  "preserved_discrepancies": [
+    "history_user_idx vs history_user_created_idx",
+    "bayyena_knowledge_emb_idx vs bayyena_embedding_idx",
+    "historical live RPC maximum 12 vs source default match_count 6 and LIMIT match_count without explicit 12 cap",
+    "CREATE POLICY at database/01-schema.sql:90-102 not idempotent as written if policies exist"
+  ],
+  "not_proven": [
+    "complete PK/FK definitions and ON DELETE behavior",
+    "defaults",
+    "indexes",
+    "RLS policies",
+    "grants",
+    "function definitions",
+    "vector dimension",
+    "replayable migrations/history",
+    "runtime RLS behavior"
+  ],
+  "no_live_change": true
+}
