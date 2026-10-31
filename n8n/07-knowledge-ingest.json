@@ -5,7 +5,7 @@
       "parameters": {
         "httpMethod": "POST",
         "path": "legal-ai/knowledge/ingest",
-        "responseMode": "lastNode",
+        "responseMode": "responseNode",
         "options": {}
       },
       "name": "Knowledge Upload Webhook",
@@ -51,11 +51,11 @@
     },
     {
       "parameters": {
-        "url": "={{ (() => { const u = String($json.body.pdf_url).trim(); if (u.includes('drive.google.com')) { const m = u.match(/\\/d\\/([^\\/?]+)/) || u.match(/[?&]id=([^&]+)/); if (m) return 'https://drive.google.com/uc?export=download&id=' + m[1]; } if (u.includes('dropbox.com')) { if (/[?&]dl=\\d/.test(u)) return u.replace(/([?&])dl=\\d/, '$1dl=1'); return u + (u.includes('?') ? '&' : '?') + 'dl=1'; } return u; })() }}",
+        "url": "={{ $json._safe_pdf_url }}",
         "options": {
           "redirect": {
             "redirect": {
-              "maxRedirects": 10
+              "maxRedirects": 0
             }
           },
           "response": {
@@ -76,7 +76,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first();\nconst binaryKeys = Object.keys(item.binary || {});\nif (binaryKeys.length === 0) {\n  const body = (item.json && item.json.body) || {};\n  let b64 = String(body.pdf_base64 || '').trim();\n  if (!b64) {\n    throw new Error('No file was uploaded. Send the PDF as multipart/form-data (field \"data\", type File), or as JSON with \"pdf_base64\" or \"pdf_url\".');\n  }\n  b64 = b64.replace(/^data:[^;,]*;base64,/i, '').replace(/\\s+/g, '');\n  const decoded = Buffer.from(b64, 'base64');\n  if (decoded.slice(0, 5).toString('latin1') !== '%PDF-') {\n    throw new Error('pdf_base64 does not decode to a PDF. Encode the raw PDF file bytes as standard base64.');\n  }\n  const bin = await this.helpers.prepareBinaryData(decoded, String(body.file_name || 'file.pdf'), 'application/pdf');\n  return [{ json: { pdf_base64: decoded.toString('base64'), file_name: String(body.file_name || ''), mime_type: 'application/pdf' }, binary: { data: bin } }];\n}\nconst key = binaryKeys.includes('data') ? 'data' : binaryKeys[0];\nconst buffer = await this.helpers.getBinaryDataBuffer(0, key);\nif (buffer.slice(0, 5).toString('latin1') !== '%PDF-') {\n  throw new Error('The received file is not a PDF. For uploads, send multipart/form-data with the field type set to File. For pdf_url, make sure the link is public and points directly to a PDF.');\n}\nlet replacementChars = 0;\nfor (let i = 0; i + 2 < Math.min(buffer.length, 200000); i++) {\n  if (buffer[i] === 0xEF && buffer[i + 1] === 0xBF && buffer[i + 2] === 0xBD) replacementChars++;\n}\nif (replacementChars > 50) {\n  throw new Error('The PDF arrived corrupted (binary bytes were converted to text by the sender). In Postman use the Desktop Agent and set the form-data key type to File, or use curl -F \"data=@file.pdf;type=application/pdf\".');\n}\nreturn [{ json: { pdf_base64: buffer.toString('base64'), file_name: item.binary[key].fileName || '', mime_type: item.binary[key].mimeType || 'application/pdf' }, binary: { data: item.binary[key] } }];"
+        "jsCode": "const MAX_PDF_BYTES = 20 * 1024 * 1024;\nconst item = $input.first();\nconst binaryKeys = Object.keys(item.binary || {});\nif (binaryKeys.length === 0) {\n  const body = (item.json && item.json.body) || {};\n  let b64 = String(body.pdf_base64 || '').trim();\n  if (!b64) {\n    throw new Error('No file was uploaded. Send the PDF as multipart/form-data (field \"data\", type File), or as JSON with \"pdf_base64\" or \"pdf_url\".');\n  }\n  b64 = b64.replace(/^data:[^;,]*;base64,/i, '').replace(/\\s+/g, '');\n  const decoded = Buffer.from(b64, 'base64');\n  if (decoded.length > MAX_PDF_BYTES) throw new Error('PDF exceeds the 20 MiB ingestion limit.');\n  if (decoded.slice(0, 5).toString('latin1') !== '%PDF-') {\n    throw new Error('pdf_base64 does not decode to a PDF. Encode the raw PDF file bytes as standard base64.');\n  }\n  const bin = await this.helpers.prepareBinaryData(decoded, String(body.file_name || 'file.pdf'), 'application/pdf');\n  return [{ json: { pdf_base64: decoded.toString('base64'), file_name: String(body.file_name || ''), mime_type: 'application/pdf' }, binary: { data: bin } }];\n}\nconst key = binaryKeys.includes('data') ? 'data' : binaryKeys[0];\nconst buffer = await this.helpers.getBinaryDataBuffer(0, key);\nif (buffer.length > MAX_PDF_BYTES) throw new Error('PDF exceeds the 20 MiB ingestion limit.');\nif (buffer.slice(0, 5).toString('latin1') !== '%PDF-') {\n  throw new Error('The received file is not a PDF. For uploads, send multipart/form-data with the field type set to File. For pdf_url, make sure the link is public and points directly to a PDF.');\n}\nlet replacementChars = 0;\nfor (let i = 0; i + 2 < Math.min(buffer.length, 200000); i++) {\n  if (buffer[i] === 0xEF && buffer[i + 1] === 0xBF && buffer[i + 2] === 0xBD) replacementChars++;\n}\nif (replacementChars > 50) {\n  throw new Error('The PDF arrived corrupted (binary bytes were converted to text by the sender). In Postman use the Desktop Agent and set the form-data key type to File, or use curl -F \"data=@file.pdf;type=application/pdf\".');\n}\nreturn [{ json: { pdf_base64: buffer.toString('base64'), file_name: item.binary[key].fileName || '', mime_type: item.binary[key].mimeType || 'application/pdf' }, binary: { data: item.binary[key] } }];"
       },
       "name": "PDF to Base64",
       "type": "n8n-nodes-base.code",
@@ -241,7 +241,8 @@
       "position": [
         16,
         368
-      ]
+      ],
+      "disabled": true
     },
     {
       "parameters": {
@@ -301,6 +302,133 @@
         1616,
         32
       ]
+    },
+    {
+      "parameters": {
+        "url": "https://dcuowxwpihkvqxbkpsxp.supabase.co/auth/v1/user",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $json.headers.authorization || $json.headers.Authorization || '' }}"
+            },
+            {
+              "name": "apikey",
+              "value": "sb_publishable_VbaS7EioE3CRn0nkSvw_nA_96zAoSdu"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "name": "Verify User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        208,
+        16
+      ],
+      "id": "f21e0caf-7f65-418c-85a1-adf60ff6aff5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "name": "Is Signed In?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        432,
+        16
+      ],
+      "id": "7c7fed5e-43f3-44b1-8946-f5742551ec4a"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"error\": \"unauthorized\",\n  \"final_answer\": \"انتهت الجلسة أو لم تسجّل الدخول.\"\n}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "name": "Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        656,
+        560
+      ],
+      "id": "5640f17e-b490-4e2a-b9a7-503bff664b41"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Knowledge Upload Webhook').first();\nconst verifiedUser = $('Verify User').first().json || {};\nif (!verifiedUser.id) throw new Error('Authentication required.');\nreturn [{ json: { body: (request.json && request.json.body) || {} }, binary: request.binary || {} }];"
+      },
+      "id": "ba0c39a4-621f-41db-96e0-43af137fdb32",
+      "name": "Restore Authenticated Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const item = $input.first();\nconst raw = String((item.json && item.json.body && item.json.body.pdf_url) || '').trim();\nif (!raw) throw new Error('A PDF URL is required for URL-based ingestion.');\nlet url;\ntry { url = new URL(raw); } catch { throw new Error('Rejected PDF URL: invalid URL.'); }\nconst host = url.hostname.toLowerCase();\nconst allowedHosts = new Set(['drive.google.com', 'www.dropbox.com', 'dropbox.com']);\nif (url.protocol !== 'https:' || !allowedHosts.has(host) || url.username || url.password || url.port || url.hash) {\n  throw new Error('Rejected PDF URL: use HTTPS on an approved Google Drive or Dropbox host without credentials, custom ports, or fragments.');\n}\nlet safeUrl;\nif (host === 'drive.google.com') {\n  const pathMatch = url.pathname.match(/^\\/file\\/d\\/([A-Za-z0-9_-]+)(?:\\/|$)/);\n  const id = (pathMatch && pathMatch[1]) || url.searchParams.get('id') || '';\n  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error('Rejected PDF URL: unsupported Google Drive link format.');\n  safeUrl = 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(id);\n} else {\n  if (!/^\\/(?:s\\/|scl\\/fi\\/)[A-Za-z0-9_-]+(?:\\/|$)/.test(url.pathname)) {\n    throw new Error('Rejected PDF URL: unsupported Dropbox link format.');\n  }\n  url.searchParams.set('dl', '1');\n  safeUrl = url.toString();\n}\nreturn [{ json: { ...item.json, _safe_pdf_url: safeUrl }, binary: item.binary || {} }];"
+      },
+      "id": "1093227d-3e24-4f90-b82f-91a8553e8a54",
+      "name": "Validate PDF URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "name": "Respond Ingest Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2112,
+        384
+      ],
+      "id": "bcdb340d-9d92-43ae-a343-11e006f7fd98"
     }
   ],
   "pinData": {},
@@ -309,7 +437,7 @@
       "main": [
         [
           {
-            "node": "Has PDF URL?",
+            "node": "Verify User",
             "type": "main",
             "index": 0
           }
@@ -320,7 +448,7 @@
       "main": [
         [
           {
-            "node": "Download PDF from URL",
+            "node": "Validate PDF URL",
             "type": "main",
             "index": 0
           }
@@ -456,6 +584,68 @@
         [
           {
             "node": "Normalize and Chunk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify User": {
+      "main": [
+        [
+          {
+            "node": "Is Signed In?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Signed In?": {
+      "main": [
+        [
+          {
+            "node": "Restore Authenticated Payload",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore Authenticated Payload": {
+      "main": [
+        [
+          {
+            "node": "Has PDF URL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate PDF URL": {
+      "main": [
+        [
+          {
+            "node": "Download PDF from URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Indexed Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond Ingest Summary",
             "type": "main",
             "index": 0
           }

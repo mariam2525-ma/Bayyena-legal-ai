@@ -337,9 +337,61 @@ test("n8n directory contains all 8 workflows, excludes raw My workflow, and has 
   );
   assert.strictEqual(
     ingest.nodes.length,
-    14,
-    "Fixed knowledge ingest workflow must have 14 nodes",
+    20,
+    "Hardened knowledge ingest workflow must have 20 nodes",
   );
+  const byName = (wf, name) => wf.nodes.find((node) => node.name === name);
+  const edgeTargets = (wf, source, output = 0) =>
+    (wf.connections[source]?.main?.[output] || []).map((edge) => edge.node);
+  assert.strictEqual(ingest.nodes.find((node) => node.name === "Legal Document Upload Form").disabled, true,
+    "Unauthenticated public upload form must stay disabled until it can carry verified auth");
+  assert.strictEqual(ingest.nodes.find((node) => node.name === "Knowledge Upload Webhook").parameters.responseMode, "responseNode");
+  assert.deepStrictEqual(edgeTargets(ingest, "Knowledge Upload Webhook"), ["Verify User"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Verify User"), ["Is Signed In?"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Is Signed In?", 0), ["Restore Authenticated Payload"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Is Signed In?", 1), ["Unauthorized"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Restore Authenticated Payload"), ["Has PDF URL?"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Has PDF URL?", 0), ["Validate PDF URL"]);
+  assert.deepStrictEqual(edgeTargets(ingest, "Validate PDF URL"), ["Download PDF from URL"]);
+  assert.strictEqual(byName(ingest, "Unauthorized").parameters.options.responseCode, 401);
+  assert.strictEqual(byName(ingest, "Verify User").parameters.options.response.response.neverError, true);
+  assert.strictEqual(byName(ingest, "Download PDF from URL").parameters.options.redirect.redirect.maxRedirects, 0,
+    "URL ingestion must not follow redirects to unvalidated hosts");
+  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /new URL\(raw\)/);
+  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /url\.protocol !== 'https:'/);
+  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /allowedHosts\.has\(host\)/);
+  assert.match(byName(ingest, "Validate PDF URL").parameters.jsCode, /url\.username \|\| url\.password/);
+  assert.match(byName(ingest, "PDF to Base64").parameters.jsCode, /MAX_PDF_BYTES/);
+  const runUrlGuard = (pdfUrl) =>
+    new Function(
+      "$input",
+      byName(ingest, "Validate PDF URL").parameters.jsCode,
+    )({
+      first: () => ({ json: { body: { pdf_url: pdfUrl } }, binary: {} }),
+    })[0].json._safe_pdf_url;
+  assert.strictEqual(
+    runUrlGuard("https://drive.google.com/file/d/abc_123-xyz/view"),
+    "https://drive.google.com/uc?export=download&id=abc_123-xyz",
+  );
+  assert.match(
+    runUrlGuard("https://www.dropbox.com/s/abc123/file.pdf?rlkey=xyz"),
+    /^https:\/\/www\.dropbox\.com\/s\/abc123\/file\.pdf\?.*dl=1/,
+  );
+  for (const blockedUrl of [
+    "http://drive.google.com/file/d/abc123/view",
+    "https://drive.google.com.attacker.example/file/d/abc123/view",
+    "https://127.0.0.1/internal.pdf",
+  ]) {
+    assert.throws(() => runUrlGuard(blockedUrl), /Rejected PDF URL/);
+  }
+  assert.deepStrictEqual(edgeTargets(ingest, "Knowledge Indexed Summary"), ["Respond Ingest Summary"]);
+
+  const configRaw = readFileSync("js/config.js", "utf8");
+  const chatRaw = readFileSync("n8n/05-knowledge-chat-rag.json", "utf8");
+  const keyRefs = (raw) => raw.match(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|sb_publishable_[A-Za-z0-9_-]+/g) || [];
+  assert.ok(keyRefs(configRaw).length > 0, "frontend must declare its public Supabase key");
+  assert.deepStrictEqual([...new Set(keyRefs(chatRaw))], [...new Set(keyRefs(configRaw))],
+    "knowledge chat must use the existing frontend Supabase publishable key reference");
   for (const f of files) {
     const raw = readFileSync("n8n/" + f, "utf8");
     const wf = JSON.parse(raw);
